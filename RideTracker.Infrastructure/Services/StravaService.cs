@@ -50,7 +50,7 @@ public class StravaService : IStravaService
             RefreshToken = result.GetProperty("refresh_token").GetString() ?? string.Empty,
             ExpiresIn = result.GetProperty("expires_in").GetInt32(),
             ExpiresAt = result.GetProperty("expires_at").GetInt64() > 0 
-                ? DateTimeOffset.FromUnixTimeSeconds(result.GetProperty("expires_at").GetInt64()).DateTime 
+                ? DateTime.SpecifyKind(DateTimeOffset.FromUnixTimeSeconds(result.GetProperty("expires_at").GetInt64()).DateTime, DateTimeKind.Utc)
                 : DateTime.UtcNow.AddSeconds(result.GetProperty("expires_in").GetInt32()),
             Athlete = new StravaAthleteDto
             {
@@ -81,7 +81,7 @@ public class StravaService : IStravaService
             RefreshToken = result.GetProperty("refresh_token").GetString() ?? string.Empty,
             ExpiresIn = result.GetProperty("expires_in").GetInt32(),
             ExpiresAt = result.GetProperty("expires_at").GetInt64() > 0 
-                ? DateTimeOffset.FromUnixTimeSeconds(result.GetProperty("expires_at").GetInt64()).DateTime 
+                ? DateTime.SpecifyKind(DateTimeOffset.FromUnixTimeSeconds(result.GetProperty("expires_at").GetInt64()).DateTime, DateTimeKind.Utc)
                 : DateTime.UtcNow.AddSeconds(result.GetProperty("expires_in").GetInt32())
         };
     }
@@ -114,7 +114,7 @@ public class StravaService : IStravaService
             var newToken = await RefreshTokenAsync(user.RefreshToken);
             user.AccessToken = newToken.AccessToken;
             user.RefreshToken = newToken.RefreshToken;
-            user.TokenExpiry = newToken.ExpiresAt;
+            user.TokenExpiry = DateTime.SpecifyKind(newToken.ExpiresAt, DateTimeKind.Utc);
             return true;
         }
         return false;

@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using RideTracker.Infrastructure.Data;
@@ -11,9 +12,11 @@ using RideTracker.Infrastructure.Data;
 namespace RideTracker.Infrastructure.Migrations
 {
     [DbContext(typeof(RideTrackerDbContext))]
-    partial class RideTrackerDbContextModelSnapshot : ModelSnapshot
+    [Migration("20251031150334_AddUserFirstNameLastName")]
+    partial class AddUserFirstNameLastName
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder

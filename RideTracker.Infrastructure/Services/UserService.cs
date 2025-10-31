@@ -42,6 +42,8 @@ public class UserService : IUserService
             Username = string.IsNullOrEmpty(tokenDto.Athlete?.Username) 
                 ? $"{tokenDto.Athlete?.Firstname} {tokenDto.Athlete?.Lastname}".Trim()
                 : tokenDto.Athlete.Username,
+            FirstName = tokenDto.Athlete?.Firstname ?? string.Empty,
+            LastName = tokenDto.Athlete?.Lastname ?? string.Empty,
             AccessToken = tokenDto.AccessToken,
             RefreshToken = tokenDto.RefreshToken,
             TokenExpiry = DateTime.SpecifyKind(tokenDto.ExpiresAt, DateTimeKind.Utc),
@@ -95,7 +97,9 @@ public class UserService : IUserService
             CurrentLat = user.Progress.CurrentLat,
             CurrentLng = user.Progress.CurrentLng,
             LastSync = user.LastSync,
-            Username = user.Username
+            Username = user.Username,
+            FirstName = user.FirstName,
+            LastName = user.LastName
         };
     }
 }
