@@ -9,7 +9,6 @@ namespace RideTracker.Infrastructure.Services;
 public class RouteService : IRouteService
 {
     private readonly RideTrackerDbContext _context;
-    private const double TOTAL_ROUTE_LENGTH_KM = 1585.0; // Approximate coastal route around Sri Lanka
 
     public RouteService(RideTrackerDbContext context)
     {
@@ -30,9 +29,27 @@ public class RouteService : IRouteService
         return points;
     }
 
-    public Task<double> GetTotalRouteLengthKmAsync()
+    public async Task<double> GetTotalRouteLengthKmAsync()
     {
-        return Task.FromResult(TOTAL_ROUTE_LENGTH_KM);
+        var points = await _context.RoutePoints
+            .OrderBy(rp => rp.OrderIndex)
+            .ToListAsync();
+
+        if (points.Count < 2)
+        {
+            return 1585.0; // Fallback to approximate value
+        }
+
+        double totalDistance = 0;
+        for (int i = 0; i < points.Count - 1; i++)
+        {
+            totalDistance += CalculateDistance(
+                points[i].Latitude, points[i].Longitude,
+                points[i + 1].Latitude, points[i + 1].Longitude
+            );
+        }
+
+        return totalDistance;
     }
 
     public async Task<Coordinate> GetCoordinateAtProgressAsync(double progressPercent)
@@ -50,27 +67,79 @@ public class RouteService : IRouteService
             return new Coordinate(5.9549, 80.5550);
         }
 
-        // Calculate which segment we're on
-        var totalSegments = points.Count - 1;
-        var segmentProgress = (progressPercent / 100.0) * totalSegments;
-        var segmentIndex = (int)Math.Floor(segmentProgress);
-        
-        // If we've completed the route, return the last point
-        if (segmentIndex >= totalSegments)
+        if (points.Count == 1)
+        {
+            return new Coordinate(points[0].Latitude, points[0].Longitude);
+        }
+
+        // Calculate cumulative distances for each point
+        var cumulativeDistances = new List<double> { 0 }; // First point is at 0km
+        double totalDistance = 0;
+
+        for (int i = 0; i < points.Count - 1; i++)
+        {
+            var distance = CalculateDistance(
+                points[i].Latitude, points[i].Longitude,
+                points[i + 1].Latitude, points[i + 1].Longitude
+            );
+            totalDistance += distance;
+            cumulativeDistances.Add(totalDistance);
+        }
+
+        // Calculate target distance based on progress percentage
+        var targetDistance = (progressPercent / 100.0) * totalDistance;
+
+        // Find which segment the target distance falls in
+        int segmentIndex = 0;
+        for (int i = 0; i < cumulativeDistances.Count - 1; i++)
+        {
+            if (targetDistance >= cumulativeDistances[i] && targetDistance <= cumulativeDistances[i + 1])
+            {
+                segmentIndex = i;
+                break;
+            }
+        }
+
+        // Handle edge case where we're at or past the end
+        if (segmentIndex >= points.Count - 1)
         {
             var lastPoint = points[^1];
             return new Coordinate(lastPoint.Latitude, lastPoint.Longitude);
         }
 
-        // Interpolate between two points
+        // Interpolate within the segment based on actual distance
         var point1 = points[segmentIndex];
         var point2 = points[segmentIndex + 1];
-        var localProgress = segmentProgress - segmentIndex;
+        var segmentStartDist = cumulativeDistances[segmentIndex];
+        var segmentEndDist = cumulativeDistances[segmentIndex + 1];
+        var segmentLength = segmentEndDist - segmentStartDist;
+        
+        var localProgress = segmentLength > 0 
+            ? (targetDistance - segmentStartDist) / segmentLength 
+            : 0;
 
         var lat = point1.Latitude + (point2.Latitude - point1.Latitude) * localProgress;
         var lng = point1.Longitude + (point2.Longitude - point1.Longitude) * localProgress;
 
         return new Coordinate(lat, lng);
+    }
+
+    // Haversine formula to calculate distance between two lat/lng points in kilometers
+    private double CalculateDistance(double lat1, double lon1, double lat2, double lon2)
+    {
+        const double R = 6371; // Earth's radius in kilometers
+        var dLat = ToRadians(lat2 - lat1);
+        var dLon = ToRadians(lon2 - lon1);
+        var a = Math.Sin(dLat / 2) * Math.Sin(dLat / 2) +
+                Math.Cos(ToRadians(lat1)) * Math.Cos(ToRadians(lat2)) *
+                Math.Sin(dLon / 2) * Math.Sin(dLon / 2);
+        var c = 2 * Math.Atan2(Math.Sqrt(a), Math.Sqrt(1 - a));
+        return R * c;
+    }
+
+    private double ToRadians(double degrees)
+    {
+        return degrees * Math.PI / 180.0;
     }
 }
 
