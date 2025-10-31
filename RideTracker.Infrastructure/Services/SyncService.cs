@@ -123,10 +123,12 @@ public class SyncService : ISyncService
 
     private async Task UpdateUserProgressAsync(User user)
     {
+        // Calculate position directly from user's total distance traveled
+        var coordinate = await _routeService.GetCoordinateAtDistanceAsync(user.TotalDistanceKm);
+        
+        // Also calculate progress percentage for display purposes
         var totalRouteLength = await _routeService.GetTotalRouteLengthKmAsync();
         var progressPercent = Math.Min(100, (user.TotalDistanceKm / totalRouteLength) * 100);
-        
-        var coordinate = await _routeService.GetCoordinateAtProgressAsync(progressPercent);
 
         var progress = await _progressRepository.FirstOrDefaultAsync(p => p.UserId == user.Id);
         

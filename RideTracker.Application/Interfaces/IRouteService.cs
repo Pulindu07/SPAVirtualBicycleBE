@@ -8,5 +8,6 @@ public interface IRouteService
     Task<List<RoutePointDto>> GetRoutePointsAsync();
     Task<double> GetTotalRouteLengthKmAsync();
     Task<Coordinate> GetCoordinateAtProgressAsync(double progressPercent);
+    Task<Coordinate> GetCoordinateAtDistanceAsync(double distanceKm);
 }
 

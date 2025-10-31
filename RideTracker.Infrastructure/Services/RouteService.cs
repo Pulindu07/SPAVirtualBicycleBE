@@ -54,9 +54,15 @@ public class RouteService : IRouteService
 
     public async Task<Coordinate> GetCoordinateAtProgressAsync(double progressPercent)
     {
-        // Clamp progress between 0 and 100
-        progressPercent = Math.Max(0, Math.Min(100, progressPercent));
+        // Convert percentage to actual distance
+        var totalRouteLength = await GetTotalRouteLengthKmAsync();
+        var targetDistance = (progressPercent / 100.0) * totalRouteLength;
+        
+        return await GetCoordinateAtDistanceAsync(targetDistance);
+    }
 
+    public async Task<Coordinate> GetCoordinateAtDistanceAsync(double distanceKm)
+    {
         var points = await _context.RoutePoints
             .OrderBy(rp => rp.OrderIndex)
             .ToListAsync();
@@ -72,7 +78,7 @@ public class RouteService : IRouteService
             return new Coordinate(points[0].Latitude, points[0].Longitude);
         }
 
-        // Calculate cumulative distances for each point
+        // Calculate cumulative distances for each waypoint
         var cumulativeDistances = new List<double> { 0 }; // First point is at 0km
         double totalDistance = 0;
 
@@ -86,8 +92,15 @@ public class RouteService : IRouteService
             cumulativeDistances.Add(totalDistance);
         }
 
-        // Calculate target distance based on progress percentage
-        var targetDistance = (progressPercent / 100.0) * totalDistance;
+        // Clamp distance to route bounds (handle cases where user exceeds total distance)
+        var targetDistance = Math.Max(0, Math.Min(distanceKm, totalDistance));
+
+        // Handle edge case: if at or past the end, return last point
+        if (targetDistance >= totalDistance)
+        {
+            var lastPoint = points[^1];
+            return new Coordinate(lastPoint.Latitude, lastPoint.Longitude);
+        }
 
         // Find which segment the target distance falls in
         int segmentIndex = 0;
@@ -100,13 +113,6 @@ public class RouteService : IRouteService
             }
         }
 
-        // Handle edge case where we're at or past the end
-        if (segmentIndex >= points.Count - 1)
-        {
-            var lastPoint = points[^1];
-            return new Coordinate(lastPoint.Latitude, lastPoint.Longitude);
-        }
-
         // Interpolate within the segment based on actual distance
         var point1 = points[segmentIndex];
         var point2 = points[segmentIndex + 1];
@@ -114,10 +120,12 @@ public class RouteService : IRouteService
         var segmentEndDist = cumulativeDistances[segmentIndex + 1];
         var segmentLength = segmentEndDist - segmentStartDist;
         
+        // Calculate how far along this segment we are (0.0 to 1.0)
         var localProgress = segmentLength > 0 
             ? (targetDistance - segmentStartDist) / segmentLength 
             : 0;
 
+        // Interpolate latitude and longitude
         var lat = point1.Latitude + (point2.Latitude - point1.Latitude) * localProgress;
         var lng = point1.Longitude + (point2.Longitude - point1.Longitude) * localProgress;
 
