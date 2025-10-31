@@ -18,7 +18,10 @@ public class OpenRouteService : IRouteGenerationService
     {
         _httpClient = httpClient;
         _logger = logger;
-        _apiKey = configuration["OpenRouteService:ApiKey"];
+        
+        // Environment variable takes precedence over appsettings.json
+        _apiKey = Environment.GetEnvironmentVariable("OPENROUTE_API_KEY")
+                  ?? configuration["OpenRouteService:ApiKey"];
     }
 
     public async Task<List<Coordinate>> GenerateRoadRouteAsync(List<Coordinate> waypoints)

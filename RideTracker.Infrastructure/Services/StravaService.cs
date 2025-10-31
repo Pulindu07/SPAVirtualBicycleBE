@@ -19,9 +19,19 @@ public class StravaService : IStravaService
     {
         _httpClient = httpClient;
         _configuration = configuration;
-        _clientId = configuration["Strava:ClientId"] ?? throw new InvalidOperationException("Strava:ClientId not configured");
-        _clientSecret = configuration["Strava:ClientSecret"] ?? throw new InvalidOperationException("Strava:ClientSecret not configured");
-        _redirectUri = configuration["Strava:RedirectUri"] ?? throw new InvalidOperationException("Strava:RedirectUri not configured");
+        
+        // Environment variables take precedence over appsettings.json
+        _clientId = Environment.GetEnvironmentVariable("STRAVA_CLIENT_ID")
+                    ?? configuration["Strava:ClientId"] 
+                    ?? throw new InvalidOperationException("Strava ClientId not configured. Set STRAVA_CLIENT_ID env var or Strava:ClientId in appsettings.json");
+        
+        _clientSecret = Environment.GetEnvironmentVariable("STRAVA_CLIENT_SECRET")
+                        ?? configuration["Strava:ClientSecret"] 
+                        ?? throw new InvalidOperationException("Strava ClientSecret not configured. Set STRAVA_CLIENT_SECRET env var or Strava:ClientSecret in appsettings.json");
+        
+        _redirectUri = Environment.GetEnvironmentVariable("STRAVA_REDIRECT_URI")
+                       ?? configuration["Strava:RedirectUri"] 
+                       ?? throw new InvalidOperationException("Strava RedirectUri not configured. Set STRAVA_REDIRECT_URI env var or Strava:RedirectUri in appsettings.json");
         
         _httpClient.BaseAddress = new Uri("https://www.strava.com/api/v3/");
     }

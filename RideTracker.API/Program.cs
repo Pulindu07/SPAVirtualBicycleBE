@@ -15,22 +15,26 @@ builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
 // Configure CORS
+var frontendUrl = Environment.GetEnvironmentVariable("FRONTEND_URL") 
+                  ?? builder.Configuration["Frontend:Url"] 
+                  ?? "http://localhost:5173";
+
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowFrontend", policy =>
     {
-        policy.WithOrigins(
-                builder.Configuration["Frontend:Url"] ?? "http://localhost:5173",
-                "http://localhost:5173"
-            )
+        policy.WithOrigins(frontendUrl, "http://localhost:5173")
             .AllowAnyMethod()
             .AllowAnyHeader()
             .AllowCredentials();
     });
 });
 
-// Configure PostgreSQL
-var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
+// Configure PostgreSQL - Environment variable takes precedence
+var connectionString = Environment.GetEnvironmentVariable("DB_CONNECTION_STRING")
+                       ?? builder.Configuration.GetConnectionString("DefaultConnection")
+                       ?? throw new InvalidOperationException("Database connection string not configured");
+
 builder.Services.AddDbContext<RideTrackerDbContext>(options =>
     options.UseNpgsql(connectionString));
 
