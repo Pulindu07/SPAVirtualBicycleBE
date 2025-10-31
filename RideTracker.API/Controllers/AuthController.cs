@@ -85,7 +85,10 @@ public class AuthController : ControllerBase
 
     private string GetFrontendUrl()
     {
-        return Configuration["Frontend:Url"] ?? "http://localhost:5173";
+        // Environment variable takes precedence over appsettings.json
+        return Environment.GetEnvironmentVariable("FRONTEND_URL")
+               ?? Configuration["Frontend:Url"] 
+               ?? "http://localhost:5173";
     }
 
     private IConfiguration Configuration => HttpContext.RequestServices.GetRequiredService<IConfiguration>();
