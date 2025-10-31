@@ -67,7 +67,7 @@ public class SyncService : ISyncService
                     Name = a.Name,
                     DistanceKm = a.Distance / 1000.0, // Convert meters to km
                     MovingTimeSec = a.MovingTime,
-                    StartDate = a.StartDate,
+                    StartDate = DateTime.SpecifyKind(a.StartDate, DateTimeKind.Utc),
                     AverageSpeed = a.AverageSpeed,
                     CreatedAt = DateTime.UtcNow
                 }).ToList();

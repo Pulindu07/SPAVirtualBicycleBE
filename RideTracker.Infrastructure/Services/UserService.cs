@@ -44,7 +44,7 @@ public class UserService : IUserService
                 : tokenDto.Athlete.Username,
             AccessToken = tokenDto.AccessToken,
             RefreshToken = tokenDto.RefreshToken,
-            TokenExpiry = tokenDto.ExpiresAt,
+            TokenExpiry = DateTime.SpecifyKind(tokenDto.ExpiresAt, DateTimeKind.Utc),
             TotalDistanceKm = 0,
             TotalMovingTimeSec = 0,
             LastSync = DateTime.UtcNow.AddYears(-1), // Set to past to trigger first sync
@@ -75,7 +75,7 @@ public class UserService : IUserService
     {
         user.AccessToken = tokenDto.AccessToken;
         user.RefreshToken = tokenDto.RefreshToken;
-        user.TokenExpiry = tokenDto.ExpiresAt;
+        user.TokenExpiry = DateTime.SpecifyKind(tokenDto.ExpiresAt, DateTimeKind.Utc);
 
         await _userRepository.UpdateAsync(user);
         await _userRepository.SaveChangesAsync();

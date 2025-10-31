@@ -36,7 +36,8 @@ builder.Services.AddDbContext<RideTrackerDbContext>(options =>
 
 // Configure Hangfire
 builder.Services.AddHangfire(config =>
-    config.UsePostgreSqlStorage(connectionString));
+    config.UsePostgreSqlStorage(options => 
+        options.UseNpgsqlConnection(connectionString)));
 builder.Services.AddHangfireServer();
 
 // Register repositories

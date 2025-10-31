@@ -31,42 +31,55 @@ public class AuthController : ControllerBase
     [HttpGet("strava/callback")]
     public async Task<IActionResult> StravaCallback([FromQuery] string code, [FromQuery] string? error)
     {
+        _logger.LogInformation("Strava callback received. Code present: {HasCode}, Error: {Error}", 
+            !string.IsNullOrEmpty(code), error);
+
         if (!string.IsNullOrEmpty(error))
         {
             _logger.LogError("Strava authorization error: {Error}", error);
-            return Redirect($"{GetFrontendUrl()}/login?error=access_denied");
+            return Redirect($"{GetFrontendUrl()}/?error=access_denied");
         }
 
         if (string.IsNullOrEmpty(code))
         {
-            return BadRequest("Authorization code is missing");
+            _logger.LogError("Authorization code is missing");
+            return Redirect($"{GetFrontendUrl()}/?error=no_code");
         }
 
         try
         {
+            _logger.LogInformation("Exchanging code for token...");
             // Exchange code for token
             var tokenDto = await _stravaService.ExchangeCodeForTokenAsync(code);
+            _logger.LogInformation("Token received for Strava ID: {StravaId}", tokenDto.Athlete?.Id);
 
             // Check if user already exists
             var existingUser = await _userService.GetUserByStravaIdAsync(tokenDto.Athlete?.Id ?? 0);
 
             if (existingUser != null)
             {
+                _logger.LogInformation("Existing user found: {UserId}", existingUser.Id);
                 // Update tokens
                 await _userService.UpdateUserTokensAsync(existingUser, tokenDto);
-                return Redirect($"{GetFrontendUrl()}/dashboard?userId={existingUser.Id}");
+                var redirectUrl = $"{GetFrontendUrl()}/dashboard?userId={existingUser.Id}";
+                _logger.LogInformation("Redirecting to: {Url}", redirectUrl);
+                return Redirect(redirectUrl);
             }
             else
             {
+                _logger.LogInformation("Creating new user...");
                 // Create new user
                 var newUser = await _userService.CreateUserAsync(tokenDto);
-                return Redirect($"{GetFrontendUrl()}/dashboard?userId={newUser.Id}");
+                _logger.LogInformation("New user created: {UserId}", newUser.Id);
+                var redirectUrl = $"{GetFrontendUrl()}/dashboard?userId={newUser.Id}";
+                _logger.LogInformation("Redirecting to: {Url}", redirectUrl);
+                return Redirect(redirectUrl);
             }
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error during Strava callback");
-            return Redirect($"{GetFrontendUrl()}/login?error=authentication_failed");
+            _logger.LogError(ex, "Error during Strava callback: {Message}", ex.Message);
+            return Redirect($"{GetFrontendUrl()}/?error=authentication_failed");
         }
     }
 
