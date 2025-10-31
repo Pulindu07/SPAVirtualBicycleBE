@@ -45,9 +45,11 @@ builder.Services.AddScoped(typeof(IRepository<>), typeof(Repository<>));
 
 // Register services
 builder.Services.AddHttpClient<IStravaService, StravaService>();
+builder.Services.AddHttpClient<IRouteGenerationService, OpenRouteService>();
 builder.Services.AddScoped<IUserService, UserService>();
 builder.Services.AddScoped<IRouteService, RouteService>();
 builder.Services.AddScoped<ISyncService, SyncService>();
+builder.Services.AddScoped<RouteGenerationService>();
 
 var app = builder.Build();
 
