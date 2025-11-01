@@ -49,7 +49,13 @@ builder.Services.AddScoped(typeof(IRepository<>), typeof(Repository<>));
 
 // Register services
 builder.Services.AddHttpClient<IStravaService, StravaService>();
-builder.Services.AddHttpClient<IRouteGenerationService, OpenRouteService>();
+
+// Route Generation Service - Choose one:
+// Option 1: Google Maps Directions API (recommended for production - better accuracy)
+builder.Services.AddHttpClient<IRouteGenerationService, GoogleMapsRouteService>();
+// Option 2: OpenRouteService (free alternative, less accurate)
+// builder.Services.AddHttpClient<IRouteGenerationService, OpenRouteService>();
+
 builder.Services.AddScoped<IUserService, UserService>();
 builder.Services.AddScoped<IRouteService, RouteService>();
 builder.Services.AddScoped<ISyncService, SyncService>();
