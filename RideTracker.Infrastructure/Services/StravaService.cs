@@ -115,7 +115,7 @@ public class StravaService : IStravaService
             StartDate = a.GetProperty("start_date").GetDateTime(),
             AverageSpeed = a.TryGetProperty("average_speed", out var avgSpeed) ? avgSpeed.GetDouble() : 0,
             SportType = a.TryGetProperty("sport_type", out var sportType) ? sportType.GetString() ?? string.Empty : string.Empty
-        }).Where(a => a.Distance > 0 && a.SportType.Contains("BikeRide", StringComparison.OrdinalIgnoreCase)).ToList() ?? new List<StravaActivityDto>();
+        }).Where(a => a.Distance > 0 && a.SportType.Contains("Ride", StringComparison.OrdinalIgnoreCase)).ToList() ?? new List<StravaActivityDto>();
     }
 
     public async Task<bool> RefreshTokenIfNeededAsync(User user)
