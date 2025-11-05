@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 using RideTracker.Application.DTOs;
 using RideTracker.Application.Interfaces;
 using RideTracker.Domain.Entities;
@@ -11,15 +12,32 @@ public class UserService : IUserService
     private readonly IRepository<User> _userRepository;
     private readonly IRepository<UserProgress> _progressRepository;
     private readonly RideTrackerDbContext _context;
+    private readonly DateTime _defaultSyncDate;
 
     public UserService(
         IRepository<User> userRepository,
         IRepository<UserProgress> progressRepository,
-        RideTrackerDbContext context)
+        RideTrackerDbContext context,
+        IConfiguration configuration)
     {
         _userRepository = userRepository;
         _progressRepository = progressRepository;
         _context = context;
+        
+        // Environment variable takes precedence, then appsettings, then default to 2025-01-01
+        var syncDateString = Environment.GetEnvironmentVariable("DEFAULT_SYNC_DATE")
+                            ?? configuration["AppSettings:DefaultSyncDate"]
+                            ?? "2025-01-01";
+        
+        if (DateTime.TryParse(syncDateString, out var parsedDate))
+        {
+            _defaultSyncDate = DateTime.SpecifyKind(parsedDate, DateTimeKind.Utc);
+        }
+        else
+        {
+            // Fallback to 2025-01-01 if parsing fails
+            _defaultSyncDate = new DateTime(2025, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+        }
     }
 
     public async Task<User?> GetUserByStravaIdAsync(long stravaId)
@@ -49,7 +67,7 @@ public class UserService : IUserService
             TokenExpiry = DateTime.SpecifyKind(tokenDto.ExpiresAt, DateTimeKind.Utc),
             TotalDistanceKm = 0,
             TotalMovingTimeSec = 0,
-            LastSync = DateTime.UtcNow.AddYears(-1), // Set to past to trigger first sync
+            LastSync = _defaultSyncDate, // Default sync date from config/env (defaults to 2025-01-01)
             CreatedAt = DateTime.UtcNow
         };
 

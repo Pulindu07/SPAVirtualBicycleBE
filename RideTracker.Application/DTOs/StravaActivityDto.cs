@@ -8,5 +8,6 @@ public class StravaActivityDto
     public long MovingTime { get; set; } // in seconds
     public DateTime StartDate { get; set; }
     public double AverageSpeed { get; set; }
+    public string SportType { get; set; } = string.Empty;
 }
 
