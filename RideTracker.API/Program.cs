@@ -59,6 +59,8 @@ builder.Services.AddHttpClient<IRouteGenerationService, GoogleMapsRouteService>(
 builder.Services.AddScoped<IUserService, UserService>();
 builder.Services.AddScoped<IRouteService, RouteService>();
 builder.Services.AddScoped<ISyncService, SyncService>();
+builder.Services.AddScoped<IGroupService, GroupService>();
+builder.Services.AddScoped<IChallengeService, ChallengeService>();
 builder.Services.AddScoped<RouteGenerationService>();
 
 var app = builder.Build();
