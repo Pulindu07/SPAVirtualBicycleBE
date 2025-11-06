@@ -21,6 +21,27 @@ public class UserController : ControllerBase
         _logger = logger;
     }
 
+    [HttpGet("{userId}")]
+    public async Task<IActionResult> GetUser(int userId)
+    {
+        try
+        {
+            var user = await _userService.GetUserDtoByIdAsync(userId);
+            
+            if (user == null)
+            {
+                return NotFound(new { message = "User not found" });
+            }
+
+            return Ok(user);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting user {UserId}", userId);
+            return StatusCode(500, new { message = "An error occurred while retrieving user information" });
+        }
+    }
+
     [HttpGet("{userId}/progress")]
     public async Task<IActionResult> GetProgress(int userId)
     {

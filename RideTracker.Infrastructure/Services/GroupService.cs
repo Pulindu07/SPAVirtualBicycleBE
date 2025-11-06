@@ -96,6 +96,11 @@ public class GroupService : IGroupService
 
     public async Task<GroupDto> CreateGroupAsync(int creatorUserId, CreateGroupDto dto)
     {
+        // Only super admins can create groups
+        var creator = await _context.Users.FindAsync(creatorUserId);
+        if (creator == null || !creator.IsSuperAdmin)
+            throw new UnauthorizedAccessException("Only super admins can create groups");
+
         var group = new Group
         {
             Name = dto.Name,
@@ -161,8 +166,14 @@ public class GroupService : IGroupService
 
     public async Task<GroupMemberDto> AddMemberAsync(int groupId, int adminUserId, AddGroupMemberDto dto)
     {
-        if (!await IsUserGroupAdminAsync(groupId, adminUserId))
-            throw new UnauthorizedAccessException("Only group admins can add members");
+        // Check if user is a group admin or super admin
+        var adminUser = await _context.Users.FindAsync(adminUserId);
+        if (adminUser == null)
+            throw new UnauthorizedAccessException("User not found");
+
+        var isGroupAdmin = await IsUserGroupAdminAsync(groupId, adminUserId);
+        if (!isGroupAdmin && !adminUser.IsSuperAdmin)
+            throw new UnauthorizedAccessException("Only group admins or super admins can add members");
 
         // Check if user is already a member
         var existingMember = await _context.GroupMembers
@@ -179,11 +190,15 @@ public class GroupService : IGroupService
         }
         else
         {
+            // Determine role: super admins are automatically admins, otherwise use provided role
+            var newMemberUser = await _context.Users.FindAsync(dto.UserId);
+            var memberRole = newMemberUser?.IsSuperAdmin == true ? "admin" : dto.Role;
+
             existingMember = new GroupMember
             {
                 GroupId = groupId,
                 UserId = dto.UserId,
-                Role = dto.Role,
+                Role = memberRole,
                 JoinedAt = DateTime.UtcNow,
                 IsActive = true
             };
@@ -274,6 +289,12 @@ public class GroupService : IGroupService
 
     public async Task<bool> IsUserGroupAdminAsync(int groupId, int userId)
     {
+        // Check if user is super admin
+        var user = await _context.Users.FindAsync(userId);
+        if (user?.IsSuperAdmin == true)
+            return true;
+
+        // Check if user is group admin
         var member = await _context.GroupMembers
             .FirstOrDefaultAsync(gm => gm.GroupId == groupId && gm.UserId == userId && gm.IsActive);
 

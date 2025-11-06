@@ -9,6 +9,7 @@ public class ChallengeDto
     public DateTime StartDate { get; set; }
     public DateTime EndDate { get; set; }
     public string ChallengeType { get; set; } = string.Empty;
+    public int? RouteId { get; set; }
     public List<ChallengeGroupDto> ParticipatingGroups { get; set; } = new();
     public int CreatedByUserId { get; set; }
     public string CreatedByUsername { get; set; } = string.Empty;
@@ -29,6 +30,7 @@ public class CreateChallengeDto
     public DateTime EndDate { get; set; }
     public string ChallengeType { get; set; } = "individual"; // "individual", "group", or "inter-group"
     public List<int> GroupIds { get; set; } = new(); // For group and inter-group challenges
+    public int? RouteId { get; set; } // Optional: route to use for this challenge
 }
 
 public class UpdateChallengeDto

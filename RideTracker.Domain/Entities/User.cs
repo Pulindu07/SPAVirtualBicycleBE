@@ -15,6 +15,7 @@ public class User
     public DateTime LastSync { get; set; }
     public DateTime CreatedAt { get; set; }
     public bool IsActive { get; set; } = true;
+    public bool IsSuperAdmin { get; set; } = false;
 
     // Navigation properties
     public ICollection<Activity> Activities { get; set; } = new List<Activity>();

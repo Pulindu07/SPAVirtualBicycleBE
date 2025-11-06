@@ -11,6 +11,8 @@ public class LeaderboardEntryDto
     public double ProgressPercentage { get; set; }
     public DateTime? LastActivityDate { get; set; }
     public bool IsCurrentUser { get; set; }
+    public double? CurrentPositionLat { get; set; }
+    public double? CurrentPositionLng { get; set; }
 }
 
 public class LeaderboardDto

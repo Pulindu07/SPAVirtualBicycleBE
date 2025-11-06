@@ -9,21 +9,26 @@ namespace RideTracker.API.Controllers;
 public class ChallengeController : ControllerBase
 {
     private readonly IChallengeService _challengeService;
+    private readonly ISyncService _syncService;
     private readonly ILogger<ChallengeController> _logger;
 
-    public ChallengeController(IChallengeService challengeService, ILogger<ChallengeController> logger)
+    public ChallengeController(
+        IChallengeService challengeService, 
+        ISyncService syncService,
+        ILogger<ChallengeController> logger)
     {
         _challengeService = challengeService;
+        _syncService = syncService;
         _logger = logger;
     }
 
     // GET: api/challenge/{id}
     [HttpGet("{id}")]
-    public async Task<ActionResult<ChallengeDto>> GetChallenge(int id)
+    public async Task<ActionResult<ChallengeDto>> GetChallenge(int id, [FromQuery] int? userId = null)
     {
         try
         {
-            var challenge = await _challengeService.GetChallengeByIdAsync(id);
+            var challenge = await _challengeService.GetChallengeByIdAsync(id, userId);
             if (challenge == null)
                 return NotFound(new { message = "Challenge not found" });
 
@@ -185,11 +190,11 @@ public class ChallengeController : ControllerBase
 
     // GET: api/challenge/{id}/progress/group
     [HttpGet("{id}/progress/group")]
-    public async Task<ActionResult<GroupChallengeProgressDto>> GetGroupProgress(int id)
+    public async Task<ActionResult<GroupChallengeProgressDto>> GetGroupProgress(int id, [FromQuery] int? userId = null)
     {
         try
         {
-            var progress = await _challengeService.GetGroupChallengeProgressAsync(id);
+            var progress = await _challengeService.GetGroupChallengeProgressAsync(id, userId);
             if (progress == null)
                 return NotFound(new { message = "Group progress not found" });
 
@@ -247,6 +252,38 @@ public class ChallengeController : ControllerBase
         {
             _logger.LogError(ex, "Error getting inter-group leaderboard for challenge {ChallengeId}", id);
             return StatusCode(500, new { message = "An error occurred while retrieving the inter-group leaderboard" });
+        }
+    }
+
+    // POST: api/challenge/{id}/sync-group
+    [HttpPost("{id}/sync-group")]
+    public async Task<ActionResult> SyncGroupChallenge(int id)
+    {
+        try
+        {
+            await _syncService.SyncGroupChallengeAsync(id);
+            return Ok(new { message = "Group challenge sync completed successfully" });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error syncing group challenge {ChallengeId}", id);
+            return StatusCode(500, new { message = "An error occurred while syncing the group challenge" });
+        }
+    }
+
+    // POST: api/challenge/{id}/sync-inter-group
+    [HttpPost("{id}/sync-inter-group")]
+    public async Task<ActionResult> SyncInterGroupChallenge(int id)
+    {
+        try
+        {
+            await _syncService.SyncInterGroupChallengeAsync(id);
+            return Ok(new { message = "Inter-group challenge sync completed successfully" });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error syncing inter-group challenge {ChallengeId}", id);
+            return StatusCode(500, new { message = "An error occurred while syncing the inter-group challenge" });
         }
     }
 }

@@ -11,6 +11,7 @@ public class RideTrackerDbContext : DbContext
 
     public DbSet<User> Users { get; set; }
     public DbSet<Activity> Activities { get; set; }
+    public DbSet<Route> Routes { get; set; }
     public DbSet<RoutePoint> RoutePoints { get; set; }
     public DbSet<UserProgress> UserProgress { get; set; }
     public DbSet<Group> Groups { get; set; }
@@ -40,6 +41,7 @@ public class RideTrackerDbContext : DbContext
             entity.Property(e => e.LastSync).HasColumnName("last_sync").HasDefaultValueSql("NOW()");
             entity.Property(e => e.CreatedAt).HasColumnName("created_at").HasDefaultValueSql("NOW()");
             entity.Property(e => e.IsActive).HasColumnName("is_active").HasDefaultValue(true);
+            entity.Property(e => e.IsSuperAdmin).HasColumnName("is_super_admin").HasDefaultValue(false);
             
             entity.HasIndex(e => e.StravaId).IsUnique();
             
@@ -67,17 +69,36 @@ public class RideTrackerDbContext : DbContext
             entity.Property(e => e.CreatedAt).HasColumnName("created_at").HasDefaultValueSql("NOW()");
         });
 
+        // Route Configuration
+        modelBuilder.Entity<Route>(entity =>
+        {
+            entity.ToTable("routes");
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Id).HasColumnName("id");
+            entity.Property(e => e.Name).HasColumnName("name").HasMaxLength(255).IsRequired();
+            entity.Property(e => e.Description).HasColumnName("description").HasMaxLength(1000);
+            entity.Property(e => e.TotalDistanceKm).HasColumnName("total_distance_km").HasDefaultValue(0);
+            entity.Property(e => e.CreatedAt).HasColumnName("created_at").HasDefaultValueSql("NOW()");
+            entity.Property(e => e.IsActive).HasColumnName("is_active").HasDefaultValue(true);
+            
+            entity.HasMany(e => e.RoutePoints)
+                .WithOne(e => e.Route)
+                .HasForeignKey(e => e.RouteId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
         // RoutePoint Configuration
         modelBuilder.Entity<RoutePoint>(entity =>
         {
             entity.ToTable("route_points");
             entity.HasKey(e => e.Id);
             entity.Property(e => e.Id).HasColumnName("id");
+            entity.Property(e => e.RouteId).HasColumnName("route_id").IsRequired();
             entity.Property(e => e.OrderIndex).HasColumnName("order_index").IsRequired();
             entity.Property(e => e.Latitude).HasColumnName("latitude").IsRequired();
             entity.Property(e => e.Longitude).HasColumnName("longitude").IsRequired();
             
-            entity.HasIndex(e => e.OrderIndex);
+            entity.HasIndex(e => new { e.RouteId, e.OrderIndex });
         });
 
         // UserProgress Configuration
@@ -149,6 +170,7 @@ public class RideTrackerDbContext : DbContext
             entity.Property(e => e.StartDate).HasColumnName("start_date").IsRequired();
             entity.Property(e => e.EndDate).HasColumnName("end_date").IsRequired();
             entity.Property(e => e.ChallengeType).HasColumnName("challenge_type").HasMaxLength(50).HasDefaultValue("individual");
+            entity.Property(e => e.RouteId).HasColumnName("route_id");
             entity.Property(e => e.CreatedByUserId).HasColumnName("created_by_user_id").IsRequired();
             entity.Property(e => e.CreatedAt).HasColumnName("created_at").HasDefaultValueSql("NOW()");
             entity.Property(e => e.IsActive).HasColumnName("is_active").HasDefaultValue(true);
@@ -157,6 +179,11 @@ public class RideTrackerDbContext : DbContext
                 .WithMany(e => e.CreatedChallenges)
                 .HasForeignKey(e => e.CreatedByUserId)
                 .OnDelete(DeleteBehavior.Restrict);
+            
+            entity.HasOne(e => e.Route)
+                .WithMany()
+                .HasForeignKey(e => e.RouteId)
+                .OnDelete(DeleteBehavior.SetNull);
         });
 
         // ChallengeGroup Configuration (Many-to-Many: Challenge <-> Group)

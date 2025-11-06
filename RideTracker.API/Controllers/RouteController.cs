@@ -17,11 +17,11 @@ public class RouteController : ControllerBase
     }
 
     [HttpGet]
-    public async Task<IActionResult> GetRoute()
+    public async Task<IActionResult> GetRoute([FromQuery] int? routeId = null)
     {
         try
         {
-            var points = await _routeService.GetRoutePointsAsync();
+            var points = await _routeService.GetRoutePointsAsync(routeId);
             return Ok(points);
         }
         catch (Exception ex)
@@ -32,17 +32,50 @@ public class RouteController : ControllerBase
     }
 
     [HttpGet("length")]
-    public async Task<IActionResult> GetRouteLength()
+    public async Task<IActionResult> GetRouteLength([FromQuery] int? routeId = null)
     {
         try
         {
-            var length = await _routeService.GetTotalRouteLengthKmAsync();
+            var length = await _routeService.GetTotalRouteLengthKmAsync(routeId);
             return Ok(new { lengthKm = length });
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error retrieving route length");
             return StatusCode(500, new { message = "An error occurred while retrieving route length" });
+        }
+    }
+
+    [HttpGet("list")]
+    public async Task<IActionResult> GetAllRoutes()
+    {
+        try
+        {
+            var routes = await _routeService.GetAllRoutesAsync();
+            return Ok(routes);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error retrieving routes");
+            return StatusCode(500, new { message = "An error occurred while retrieving routes" });
+        }
+    }
+
+    [HttpGet("{routeId}")]
+    public async Task<IActionResult> GetRoute(int routeId)
+    {
+        try
+        {
+            var route = await _routeService.GetRouteByIdAsync(routeId);
+            if (route == null)
+                return NotFound(new { message = "Route not found" });
+
+            return Ok(route);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error retrieving route {RouteId}", routeId);
+            return StatusCode(500, new { message = "An error occurred while retrieving the route" });
         }
     }
 }

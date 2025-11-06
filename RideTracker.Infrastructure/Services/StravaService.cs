@@ -82,7 +82,13 @@ public class StravaService : IStravaService
             grant_type = "refresh_token"
         });
 
-        response.EnsureSuccessStatusCode();
+        if (!response.IsSuccessStatusCode)
+        {
+            var errorContent = await response.Content.ReadAsStringAsync();
+            throw new HttpRequestException(
+                $"Strava token refresh failed with status {response.StatusCode}. Response: {errorContent}");
+        }
+
         var result = await response.Content.ReadFromJsonAsync<JsonElement>();
 
         return new StravaTokenDto
@@ -98,10 +104,11 @@ public class StravaService : IStravaService
 
     public async Task<List<StravaActivityDto>> GetActivitiesAfterAsync(string accessToken, DateTime after)
     {
-        _httpClient.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", accessToken);
+        // Create a request message to avoid modifying shared DefaultRequestHeaders
+        var request = new HttpRequestMessage(HttpMethod.Get, $"athlete/activities?after={new DateTimeOffset(after).ToUnixTimeSeconds()}&per_page=200");
+        request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", accessToken);
         
-        var unixTime = new DateTimeOffset(after).ToUnixTimeSeconds();
-        var response = await _httpClient.GetAsync($"athlete/activities?after={unixTime}&per_page=200");
+        var response = await _httpClient.SendAsync(request);
         
         response.EnsureSuccessStatusCode();
         var activities = await response.Content.ReadFromJsonAsync<JsonElement[]>();
@@ -119,6 +126,11 @@ public class StravaService : IStravaService
 
     public async Task<bool> RefreshTokenIfNeededAsync(User user)
     {
+        if (string.IsNullOrWhiteSpace(user.RefreshToken))
+        {
+            throw new InvalidOperationException($"User {user.Id} has no refresh token. User needs to re-authenticate with Strava.");
+        }
+
         if (user.TokenExpiry <= DateTime.UtcNow.AddMinutes(5))
         {
             var newToken = await RefreshTokenAsync(user.RefreshToken);

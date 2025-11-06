@@ -5,7 +5,7 @@ namespace RideTracker.Application.Interfaces;
 public interface IChallengeService
 {
     // Challenge Management
-    Task<ChallengeDto?> GetChallengeByIdAsync(int challengeId);
+    Task<ChallengeDto?> GetChallengeByIdAsync(int challengeId, int? userId = null);
     Task<List<ChallengeDto>> GetUserChallengesAsync(int userId);
     Task<List<ChallengeDto>> GetGroupChallengesAsync(int groupId);
     Task<ChallengeDto> CreateChallengeAsync(int creatorUserId, CreateChallengeDto dto);
@@ -19,7 +19,7 @@ public interface IChallengeService
     
     // Challenge Progress
     Task<ChallengeProgressDto?> GetUserChallengeProgressAsync(int challengeId, int userId);
-    Task<GroupChallengeProgressDto?> GetGroupChallengeProgressAsync(int challengeId);
+    Task<GroupChallengeProgressDto?> GetGroupChallengeProgressAsync(int challengeId, int? userId = null);
     Task UpdateChallengeProgressAsync(int challengeId, int userId);
     
     // Leaderboard

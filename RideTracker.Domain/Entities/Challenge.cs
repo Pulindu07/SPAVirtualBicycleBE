@@ -9,12 +9,14 @@ public class Challenge
     public DateTime StartDate { get; set; }
     public DateTime EndDate { get; set; }
     public string ChallengeType { get; set; } = "individual"; // "individual", "group", or "inter-group"
+    public int? RouteId { get; set; } // Optional: if null, uses default route
     public int CreatedByUserId { get; set; }
     public DateTime CreatedAt { get; set; }
     public bool IsActive { get; set; } = true;
 
     // Navigation properties
     public User CreatedBy { get; set; } = null!;
+    public Route? Route { get; set; }
     public ICollection<ChallengeGroup> ParticipatingGroups { get; set; } = new List<ChallengeGroup>();
     public ICollection<ChallengeParticipant> Participants { get; set; } = new List<ChallengeParticipant>();
     public ICollection<ChallengeProgress> ProgressRecords { get; set; } = new List<ChallengeProgress>();
