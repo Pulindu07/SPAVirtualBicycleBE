@@ -59,6 +59,8 @@ builder.Services.AddHttpClient<IRouteGenerationService, GoogleMapsRouteService>(
 builder.Services.AddScoped<IUserService, UserService>();
 builder.Services.AddScoped<IRouteService, RouteService>();
 builder.Services.AddScoped<ISyncService, SyncService>();
+builder.Services.AddScoped<IGroupService, GroupService>();
+builder.Services.AddScoped<IChallengeService, ChallengeService>();
 builder.Services.AddScoped<RouteGenerationService>();
 
 var app = builder.Build();
@@ -91,13 +93,17 @@ using (var scope = app.Services.CreateScope())
     {
         context.Database.Migrate();
         
-        // Seed route points if they don't exist
-        if (!context.RoutePoints.Any())
+        // Seed route and route points if they don't exist
+        if (!context.Routes.Any())
         {
-            var routePoints = SeedData.GetSriLankaCoastalRoute();
+            var route = SeedData.GetDefaultRoute();
+            context.Routes.Add(route);
+            context.SaveChanges();
+            
+            var routePoints = SeedData.GetSriLankaCoastalRoute(route.Id);
             context.RoutePoints.AddRange(routePoints);
             context.SaveChanges();
-            Console.WriteLine("Route points seeded successfully");
+            Console.WriteLine("Route and route points seeded successfully");
         }
     }
     catch (Exception ex)
@@ -110,6 +116,18 @@ using (var scope = app.Services.CreateScope())
 RecurringJob.AddOrUpdate<ISyncService>(
     "sync-all-users",
     service => service.SyncAllUsersAsync(),
+    "0 */2 * * *"); // Every 2 hours
+
+// Configure recurring job for syncing group challenges every 2 hours
+RecurringJob.AddOrUpdate<ISyncService>(
+    "sync-all-group-challenges",
+    service => service.SyncAllGroupChallengesAsync(),
+    "0 */2 * * *"); // Every 2 hours
+
+// Configure recurring job for syncing inter-group challenges every 2 hours
+RecurringJob.AddOrUpdate<ISyncService>(
+    "sync-all-inter-group-challenges",
+    service => service.SyncAllInterGroupChallengesAsync(),
     "0 */2 * * *"); // Every 2 hours
 
 Console.WriteLine("RideTracker API is running...");

@@ -101,6 +101,28 @@ public class UserService : IUserService
         await _userRepository.SaveChangesAsync();
     }
 
+    public async Task<UserDto?> GetUserDtoByIdAsync(int userId)
+    {
+        var user = await GetUserByIdAsync(userId);
+        if (user == null)
+            return null;
+
+        return new UserDto
+        {
+            Id = user.Id,
+            StravaId = user.StravaId,
+            Username = user.Username,
+            FirstName = user.FirstName,
+            LastName = user.LastName,
+            TotalDistanceKm = user.TotalDistanceKm,
+            TotalMovingTimeSec = user.TotalMovingTimeSec,
+            LastSync = user.LastSync,
+            CreatedAt = user.CreatedAt,
+            IsActive = user.IsActive,
+            IsSuperAdmin = user.IsSuperAdmin
+        };
+    }
+
     public async Task<UserProgressDto?> GetUserProgressAsync(int userId)
     {
         var user = await GetUserByIdAsync(userId);

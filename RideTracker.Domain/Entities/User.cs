@@ -14,9 +14,16 @@ public class User
     public long TotalMovingTimeSec { get; set; }
     public DateTime LastSync { get; set; }
     public DateTime CreatedAt { get; set; }
+    public bool IsActive { get; set; } = true;
+    public bool IsSuperAdmin { get; set; } = false;
 
     // Navigation properties
     public ICollection<Activity> Activities { get; set; } = new List<Activity>();
     public UserProgress? Progress { get; set; }
+    public ICollection<GroupMember> GroupMemberships { get; set; } = new List<GroupMember>();
+    public ICollection<ChallengeParticipant> ChallengeParticipations { get; set; } = new List<ChallengeParticipant>();
+    public ICollection<ChallengeProgress> ChallengeProgressRecords { get; set; } = new List<ChallengeProgress>();
+    public ICollection<Group> CreatedGroups { get; set; } = new List<Group>();
+    public ICollection<Challenge> CreatedChallenges { get; set; } = new List<Challenge>();
 }
 

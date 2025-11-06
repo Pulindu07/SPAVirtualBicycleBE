@@ -7,6 +7,7 @@ public interface IUserService
 {
     Task<User?> GetUserByStravaIdAsync(long stravaId);
     Task<User?> GetUserByIdAsync(int userId);
+    Task<UserDto?> GetUserDtoByIdAsync(int userId);
     Task<User> CreateUserAsync(StravaTokenDto tokenDto);
     Task UpdateUserTokensAsync(User user, StravaTokenDto tokenDto);
     Task<UserProgressDto?> GetUserProgressAsync(int userId);

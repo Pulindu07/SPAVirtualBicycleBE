@@ -15,9 +15,24 @@ public class RouteService : IRouteService
         _context = context;
     }
 
-    public async Task<List<RoutePointDto>> GetRoutePointsAsync()
+    public async Task<List<RoutePointDto>> GetRoutePointsAsync(int? routeId = null)
     {
+        // If no routeId specified, use the default route (first active route)
+        if (!routeId.HasValue)
+        {
+            var defaultRoute = await _context.Routes
+                .Where(r => r.IsActive)
+                .OrderBy(r => r.Id)
+                .FirstOrDefaultAsync();
+            
+            if (defaultRoute != null)
+            {
+                routeId = defaultRoute.Id;
+            }
+        }
+
         var points = await _context.RoutePoints
+            .Where(rp => routeId.HasValue ? rp.RouteId == routeId.Value : true)
             .OrderBy(rp => rp.OrderIndex)
             .Select(rp => new RoutePointDto
             {
@@ -29,15 +44,39 @@ public class RouteService : IRouteService
         return points;
     }
 
-    public async Task<double> GetTotalRouteLengthKmAsync()
+    public async Task<double> GetTotalRouteLengthKmAsync(int? routeId = null)
     {
+        // If no routeId specified, use the default route (first active route)
+        if (!routeId.HasValue)
+        {
+            var defaultRoute = await _context.Routes
+                .Where(r => r.IsActive)
+                .OrderBy(r => r.Id)
+                .FirstOrDefaultAsync();
+            
+            if (defaultRoute != null)
+            {
+                return defaultRoute.TotalDistanceKm;
+            }
+        }
+        else
+        {
+            var route = await _context.Routes.FindAsync(routeId.Value);
+            if (route != null)
+            {
+                return route.TotalDistanceKm;
+            }
+        }
+
+        // Fallback: calculate from route points if route not found
         var points = await _context.RoutePoints
+            .Where(rp => routeId.HasValue ? rp.RouteId == routeId.Value : true)
             .OrderBy(rp => rp.OrderIndex)
             .ToListAsync();
 
         if (points.Count < 2)
         {
-            return 1585.0; // Fallback to approximate value
+            return 0; // Fallback to approximate value
         }
 
         double totalDistance = 0;
@@ -52,18 +91,33 @@ public class RouteService : IRouteService
         return totalDistance;
     }
 
-    public async Task<Coordinate> GetCoordinateAtProgressAsync(double progressPercent)
+    public async Task<Coordinate> GetCoordinateAtProgressAsync(double progressPercent, int? routeId = null)
     {
         // Convert percentage to actual distance
-        var totalRouteLength = await GetTotalRouteLengthKmAsync();
+        var totalRouteLength = await GetTotalRouteLengthKmAsync(routeId);
         var targetDistance = (progressPercent / 100.0) * totalRouteLength;
         
-        return await GetCoordinateAtDistanceAsync(targetDistance);
+        return await GetCoordinateAtDistanceAsync(targetDistance, routeId);
     }
 
-    public async Task<Coordinate> GetCoordinateAtDistanceAsync(double distanceKm)
+    public async Task<Coordinate> GetCoordinateAtDistanceAsync(double distanceKm, int? routeId = null)
     {
+        // If no routeId specified, use the default route (first active route)
+        if (!routeId.HasValue)
+        {
+            var defaultRoute = await _context.Routes
+                .Where(r => r.IsActive)
+                .OrderBy(r => r.Id)
+                .FirstOrDefaultAsync();
+            
+            if (defaultRoute != null)
+            {
+                routeId = defaultRoute.Id;
+            }
+        }
+
         var points = await _context.RoutePoints
+            .Where(rp => routeId.HasValue ? rp.RouteId == routeId.Value : true)
             .OrderBy(rp => rp.OrderIndex)
             .ToListAsync();
 
@@ -143,6 +197,41 @@ public class RouteService : IRouteService
                 Math.Sin(dLon / 2) * Math.Sin(dLon / 2);
         var c = 2 * Math.Atan2(Math.Sqrt(a), Math.Sqrt(1 - a));
         return R * c;
+    }
+
+    public async Task<List<RouteDto>> GetAllRoutesAsync()
+    {
+        var routes = await _context.Routes
+            .OrderBy(r => r.CreatedAt)
+            .Select(r => new RouteDto
+            {
+                Id = r.Id,
+                Name = r.Name,
+                Description = r.Description,
+                TotalDistanceKm = r.TotalDistanceKm,
+                CreatedAt = r.CreatedAt,
+                IsActive = r.IsActive
+            })
+            .ToListAsync();
+
+        return routes;
+    }
+
+    public async Task<RouteDto?> GetRouteByIdAsync(int routeId)
+    {
+        var route = await _context.Routes.FindAsync(routeId);
+        if (route == null)
+            return null;
+
+        return new RouteDto
+        {
+            Id = route.Id,
+            Name = route.Name,
+            Description = route.Description,
+            TotalDistanceKm = route.TotalDistanceKm,
+            CreatedAt = route.CreatedAt,
+            IsActive = route.IsActive
+        };
     }
 
     private double ToRadians(double degrees)

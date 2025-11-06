@@ -11,8 +11,15 @@ public class RideTrackerDbContext : DbContext
 
     public DbSet<User> Users { get; set; }
     public DbSet<Activity> Activities { get; set; }
+    public DbSet<Route> Routes { get; set; }
     public DbSet<RoutePoint> RoutePoints { get; set; }
     public DbSet<UserProgress> UserProgress { get; set; }
+    public DbSet<Group> Groups { get; set; }
+    public DbSet<GroupMember> GroupMembers { get; set; }
+    public DbSet<Challenge> Challenges { get; set; }
+    public DbSet<ChallengeGroup> ChallengeGroups { get; set; }
+    public DbSet<ChallengeParticipant> ChallengeParticipants { get; set; }
+    public DbSet<ChallengeProgress> ChallengeProgress { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -33,6 +40,8 @@ public class RideTrackerDbContext : DbContext
             entity.Property(e => e.TotalMovingTimeSec).HasColumnName("total_moving_time_sec").HasDefaultValue(0);
             entity.Property(e => e.LastSync).HasColumnName("last_sync").HasDefaultValueSql("NOW()");
             entity.Property(e => e.CreatedAt).HasColumnName("created_at").HasDefaultValueSql("NOW()");
+            entity.Property(e => e.IsActive).HasColumnName("is_active").HasDefaultValue(true);
+            entity.Property(e => e.IsSuperAdmin).HasColumnName("is_super_admin").HasDefaultValue(false);
             
             entity.HasIndex(e => e.StravaId).IsUnique();
             
@@ -60,17 +69,36 @@ public class RideTrackerDbContext : DbContext
             entity.Property(e => e.CreatedAt).HasColumnName("created_at").HasDefaultValueSql("NOW()");
         });
 
+        // Route Configuration
+        modelBuilder.Entity<Route>(entity =>
+        {
+            entity.ToTable("routes");
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Id).HasColumnName("id");
+            entity.Property(e => e.Name).HasColumnName("name").HasMaxLength(255).IsRequired();
+            entity.Property(e => e.Description).HasColumnName("description").HasMaxLength(1000);
+            entity.Property(e => e.TotalDistanceKm).HasColumnName("total_distance_km").HasDefaultValue(0);
+            entity.Property(e => e.CreatedAt).HasColumnName("created_at").HasDefaultValueSql("NOW()");
+            entity.Property(e => e.IsActive).HasColumnName("is_active").HasDefaultValue(true);
+            
+            entity.HasMany(e => e.RoutePoints)
+                .WithOne(e => e.Route)
+                .HasForeignKey(e => e.RouteId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
         // RoutePoint Configuration
         modelBuilder.Entity<RoutePoint>(entity =>
         {
             entity.ToTable("route_points");
             entity.HasKey(e => e.Id);
             entity.Property(e => e.Id).HasColumnName("id");
+            entity.Property(e => e.RouteId).HasColumnName("route_id").IsRequired();
             entity.Property(e => e.OrderIndex).HasColumnName("order_index").IsRequired();
             entity.Property(e => e.Latitude).HasColumnName("latitude").IsRequired();
             entity.Property(e => e.Longitude).HasColumnName("longitude").IsRequired();
             
-            entity.HasIndex(e => e.OrderIndex);
+            entity.HasIndex(e => new { e.RouteId, e.OrderIndex });
         });
 
         // UserProgress Configuration
@@ -85,6 +113,153 @@ public class RideTrackerDbContext : DbContext
             entity.Property(e => e.CurrentLat).HasColumnName("current_lat");
             entity.Property(e => e.CurrentLng).HasColumnName("current_lng");
             entity.Property(e => e.UpdatedAt).HasColumnName("updated_at").HasDefaultValueSql("NOW()");
+        });
+
+        // Group Configuration
+        modelBuilder.Entity<Group>(entity =>
+        {
+            entity.ToTable("groups");
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Id).HasColumnName("id");
+            entity.Property(e => e.Name).HasColumnName("name").HasMaxLength(255).IsRequired();
+            entity.Property(e => e.IconUrl).HasColumnName("icon_url").HasMaxLength(500);
+            entity.Property(e => e.CreatedByUserId).HasColumnName("created_by_user_id").IsRequired();
+            entity.Property(e => e.CreatedAt).HasColumnName("created_at").HasDefaultValueSql("NOW()");
+            entity.Property(e => e.IsActive).HasColumnName("is_active").HasDefaultValue(true);
+            
+            entity.HasOne(e => e.CreatedBy)
+                .WithMany(e => e.CreatedGroups)
+                .HasForeignKey(e => e.CreatedByUserId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        // GroupMember Configuration
+        modelBuilder.Entity<GroupMember>(entity =>
+        {
+            entity.ToTable("group_members");
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Id).HasColumnName("id");
+            entity.Property(e => e.GroupId).HasColumnName("group_id").IsRequired();
+            entity.Property(e => e.UserId).HasColumnName("user_id").IsRequired();
+            entity.Property(e => e.Role).HasColumnName("role").HasMaxLength(50).HasDefaultValue("member");
+            entity.Property(e => e.JoinedAt).HasColumnName("joined_at").HasDefaultValueSql("NOW()");
+            entity.Property(e => e.IsActive).HasColumnName("is_active").HasDefaultValue(true);
+            
+            entity.HasOne(e => e.Group)
+                .WithMany(e => e.Members)
+                .HasForeignKey(e => e.GroupId)
+                .OnDelete(DeleteBehavior.Cascade);
+            
+            entity.HasOne(e => e.User)
+                .WithMany(e => e.GroupMemberships)
+                .HasForeignKey(e => e.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+            
+            entity.HasIndex(e => new { e.GroupId, e.UserId }).IsUnique();
+        });
+
+        // Challenge Configuration
+        modelBuilder.Entity<Challenge>(entity =>
+        {
+            entity.ToTable("challenges");
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Id).HasColumnName("id");
+            entity.Property(e => e.Name).HasColumnName("name").HasMaxLength(255).IsRequired();
+            entity.Property(e => e.Description).HasColumnName("description").HasMaxLength(1000);
+            entity.Property(e => e.TargetDistanceKm).HasColumnName("target_distance_km").IsRequired();
+            entity.Property(e => e.StartDate).HasColumnName("start_date").IsRequired();
+            entity.Property(e => e.EndDate).HasColumnName("end_date").IsRequired();
+            entity.Property(e => e.ChallengeType).HasColumnName("challenge_type").HasMaxLength(50).HasDefaultValue("individual");
+            entity.Property(e => e.RouteId).HasColumnName("route_id");
+            entity.Property(e => e.CreatedByUserId).HasColumnName("created_by_user_id").IsRequired();
+            entity.Property(e => e.CreatedAt).HasColumnName("created_at").HasDefaultValueSql("NOW()");
+            entity.Property(e => e.IsActive).HasColumnName("is_active").HasDefaultValue(true);
+            
+            entity.HasOne(e => e.CreatedBy)
+                .WithMany(e => e.CreatedChallenges)
+                .HasForeignKey(e => e.CreatedByUserId)
+                .OnDelete(DeleteBehavior.Restrict);
+            
+            entity.HasOne(e => e.Route)
+                .WithMany()
+                .HasForeignKey(e => e.RouteId)
+                .OnDelete(DeleteBehavior.SetNull);
+        });
+
+        // ChallengeGroup Configuration (Many-to-Many: Challenge <-> Group)
+        modelBuilder.Entity<ChallengeGroup>(entity =>
+        {
+            entity.ToTable("challenge_groups");
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Id).HasColumnName("id");
+            entity.Property(e => e.ChallengeId).HasColumnName("challenge_id").IsRequired();
+            entity.Property(e => e.GroupId).HasColumnName("group_id").IsRequired();
+            entity.Property(e => e.JoinedAt).HasColumnName("joined_at").HasDefaultValueSql("NOW()");
+            entity.Property(e => e.IsActive).HasColumnName("is_active").HasDefaultValue(true);
+            
+            entity.HasOne(e => e.Challenge)
+                .WithMany(e => e.ParticipatingGroups)
+                .HasForeignKey(e => e.ChallengeId)
+                .OnDelete(DeleteBehavior.Cascade);
+            
+            entity.HasOne(e => e.Group)
+                .WithMany(e => e.ChallengeParticipations)
+                .HasForeignKey(e => e.GroupId)
+                .OnDelete(DeleteBehavior.Cascade);
+            
+            entity.HasIndex(e => new { e.ChallengeId, e.GroupId }).IsUnique();
+        });
+
+        // ChallengeParticipant Configuration
+        modelBuilder.Entity<ChallengeParticipant>(entity =>
+        {
+            entity.ToTable("challenge_participants");
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Id).HasColumnName("id");
+            entity.Property(e => e.ChallengeId).HasColumnName("challenge_id").IsRequired();
+            entity.Property(e => e.UserId).HasColumnName("user_id").IsRequired();
+            entity.Property(e => e.JoinedAt).HasColumnName("joined_at").HasDefaultValueSql("NOW()");
+            entity.Property(e => e.IsActive).HasColumnName("is_active").HasDefaultValue(true);
+            
+            entity.HasOne(e => e.Challenge)
+                .WithMany(e => e.Participants)
+                .HasForeignKey(e => e.ChallengeId)
+                .OnDelete(DeleteBehavior.Cascade);
+            
+            entity.HasOne(e => e.User)
+                .WithMany(e => e.ChallengeParticipations)
+                .HasForeignKey(e => e.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+            
+            entity.HasIndex(e => new { e.ChallengeId, e.UserId }).IsUnique();
+        });
+
+        // ChallengeProgress Configuration
+        modelBuilder.Entity<ChallengeProgress>(entity =>
+        {
+            entity.ToTable("challenge_progress");
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Id).HasColumnName("id");
+            entity.Property(e => e.ChallengeId).HasColumnName("challenge_id").IsRequired();
+            entity.Property(e => e.UserId).HasColumnName("user_id").IsRequired();
+            entity.Property(e => e.DistanceCoveredKm).HasColumnName("distance_covered_km").HasDefaultValue(0);
+            entity.Property(e => e.ProgressPercentage).HasColumnName("progress_percentage").HasDefaultValue(0);
+            entity.Property(e => e.CurrentPositionLat).HasColumnName("current_position_lat");
+            entity.Property(e => e.CurrentPositionLng).HasColumnName("current_position_lng");
+            entity.Property(e => e.LastActivityDate).HasColumnName("last_activity_date");
+            entity.Property(e => e.UpdatedAt).HasColumnName("updated_at").HasDefaultValueSql("NOW()");
+            
+            entity.HasOne(e => e.Challenge)
+                .WithMany(e => e.ProgressRecords)
+                .HasForeignKey(e => e.ChallengeId)
+                .OnDelete(DeleteBehavior.Cascade);
+            
+            entity.HasOne(e => e.User)
+                .WithMany(e => e.ChallengeProgressRecords)
+                .HasForeignKey(e => e.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+            
+            entity.HasIndex(e => new { e.ChallengeId, e.UserId }).IsUnique();
         });
     }
 }

@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using RideTracker.Infrastructure.Data;
@@ -11,9 +12,11 @@ using RideTracker.Infrastructure.Data;
 namespace RideTracker.Infrastructure.Migrations
 {
     [DbContext(typeof(RideTrackerDbContext))]
-    partial class RideTrackerDbContextModelSnapshot : ModelSnapshot
+    [Migration("20251105064839_AddGroupsAndChallenges")]
+    partial class AddGroupsAndChallenges
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -103,6 +106,10 @@ namespace RideTracker.Infrastructure.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("end_date");
 
+                    b.Property<int?>("GroupId")
+                        .HasColumnType("integer")
+                        .HasColumnName("group_id");
+
                     b.Property<bool>("IsActive")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
@@ -114,10 +121,6 @@ namespace RideTracker.Infrastructure.Migrations
                         .HasMaxLength(255)
                         .HasColumnType("character varying(255)")
                         .HasColumnName("name");
-
-                    b.Property<int?>("RouteId")
-                        .HasColumnType("integer")
-                        .HasColumnName("route_id");
 
                     b.Property<DateTime>("StartDate")
                         .HasColumnType("timestamp with time zone")
@@ -131,48 +134,9 @@ namespace RideTracker.Infrastructure.Migrations
 
                     b.HasIndex("CreatedByUserId");
 
-                    b.HasIndex("RouteId");
-
-                    b.ToTable("challenges", (string)null);
-                });
-
-            modelBuilder.Entity("RideTracker.Domain.Entities.ChallengeGroup", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer")
-                        .HasColumnName("id");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
-
-                    b.Property<int>("ChallengeId")
-                        .HasColumnType("integer")
-                        .HasColumnName("challenge_id");
-
-                    b.Property<int>("GroupId")
-                        .HasColumnType("integer")
-                        .HasColumnName("group_id");
-
-                    b.Property<bool>("IsActive")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("boolean")
-                        .HasDefaultValue(true)
-                        .HasColumnName("is_active");
-
-                    b.Property<DateTime>("JoinedAt")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("joined_at")
-                        .HasDefaultValueSql("NOW()");
-
-                    b.HasKey("Id");
-
                     b.HasIndex("GroupId");
 
-                    b.HasIndex("ChallengeId", "GroupId")
-                        .IsUnique();
-
-                    b.ToTable("challenge_groups", (string)null);
+                    b.ToTable("challenges", (string)null);
                 });
 
             modelBuilder.Entity("RideTracker.Domain.Entities.ChallengeParticipant", b =>
@@ -361,49 +325,6 @@ namespace RideTracker.Infrastructure.Migrations
                     b.ToTable("group_members", (string)null);
                 });
 
-            modelBuilder.Entity("RideTracker.Domain.Entities.Route", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer")
-                        .HasColumnName("id");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
-
-                    b.Property<DateTime>("CreatedAt")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at")
-                        .HasDefaultValueSql("NOW()");
-
-                    b.Property<string>("Description")
-                        .HasMaxLength(1000)
-                        .HasColumnType("character varying(1000)")
-                        .HasColumnName("description");
-
-                    b.Property<bool>("IsActive")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("boolean")
-                        .HasDefaultValue(true)
-                        .HasColumnName("is_active");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasMaxLength(255)
-                        .HasColumnType("character varying(255)")
-                        .HasColumnName("name");
-
-                    b.Property<double>("TotalDistanceKm")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("double precision")
-                        .HasDefaultValue(0.0)
-                        .HasColumnName("total_distance_km");
-
-                    b.HasKey("Id");
-
-                    b.ToTable("routes", (string)null);
-                });
-
             modelBuilder.Entity("RideTracker.Domain.Entities.RoutePoint", b =>
                 {
                     b.Property<int>("Id")
@@ -425,13 +346,9 @@ namespace RideTracker.Infrastructure.Migrations
                         .HasColumnType("integer")
                         .HasColumnName("order_index");
 
-                    b.Property<int>("RouteId")
-                        .HasColumnType("integer")
-                        .HasColumnName("route_id");
-
                     b.HasKey("Id");
 
-                    b.HasIndex("RouteId", "OrderIndex");
+                    b.HasIndex("OrderIndex");
 
                     b.ToTable("route_points", (string)null);
                 });
@@ -465,12 +382,6 @@ namespace RideTracker.Infrastructure.Migrations
                         .HasColumnType("boolean")
                         .HasDefaultValue(true)
                         .HasColumnName("is_active");
-
-                    b.Property<bool>("IsSuperAdmin")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("boolean")
-                        .HasDefaultValue(false)
-                        .HasColumnName("is_super_admin");
 
                     b.Property<string>("LastName")
                         .IsRequired()
@@ -583,31 +494,12 @@ namespace RideTracker.Infrastructure.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
-                    b.HasOne("RideTracker.Domain.Entities.Route", "Route")
-                        .WithMany()
-                        .HasForeignKey("RouteId")
-                        .OnDelete(DeleteBehavior.SetNull);
+                    b.HasOne("RideTracker.Domain.Entities.Group", "Group")
+                        .WithMany("Challenges")
+                        .HasForeignKey("GroupId")
+                        .OnDelete(DeleteBehavior.Restrict);
 
                     b.Navigation("CreatedBy");
-
-                    b.Navigation("Route");
-                });
-
-            modelBuilder.Entity("RideTracker.Domain.Entities.ChallengeGroup", b =>
-                {
-                    b.HasOne("RideTracker.Domain.Entities.Challenge", "Challenge")
-                        .WithMany("ParticipatingGroups")
-                        .HasForeignKey("ChallengeId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("RideTracker.Domain.Entities.Group", "Group")
-                        .WithMany("ChallengeParticipations")
-                        .HasForeignKey("GroupId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Challenge");
 
                     b.Navigation("Group");
                 });
@@ -680,17 +572,6 @@ namespace RideTracker.Infrastructure.Migrations
                     b.Navigation("User");
                 });
 
-            modelBuilder.Entity("RideTracker.Domain.Entities.RoutePoint", b =>
-                {
-                    b.HasOne("RideTracker.Domain.Entities.Route", "Route")
-                        .WithMany("RoutePoints")
-                        .HasForeignKey("RouteId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Route");
-                });
-
             modelBuilder.Entity("RideTracker.Domain.Entities.UserProgress", b =>
                 {
                     b.HasOne("RideTracker.Domain.Entities.User", "User")
@@ -706,21 +587,14 @@ namespace RideTracker.Infrastructure.Migrations
                 {
                     b.Navigation("Participants");
 
-                    b.Navigation("ParticipatingGroups");
-
                     b.Navigation("ProgressRecords");
                 });
 
             modelBuilder.Entity("RideTracker.Domain.Entities.Group", b =>
                 {
-                    b.Navigation("ChallengeParticipations");
+                    b.Navigation("Challenges");
 
                     b.Navigation("Members");
-                });
-
-            modelBuilder.Entity("RideTracker.Domain.Entities.Route", b =>
-                {
-                    b.Navigation("RoutePoints");
                 });
 
             modelBuilder.Entity("RideTracker.Domain.Entities.User", b =>

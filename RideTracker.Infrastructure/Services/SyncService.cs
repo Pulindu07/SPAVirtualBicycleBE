@@ -1,3 +1,4 @@
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using RideTracker.Application.Interfaces;
 using RideTracker.Domain.Entities;
@@ -12,6 +13,7 @@ public class SyncService : ISyncService
     private readonly IRepository<UserProgress> _progressRepository;
     private readonly IStravaService _stravaService;
     private readonly IRouteService _routeService;
+    private readonly IChallengeService _challengeService;
     private readonly RideTrackerDbContext _context;
     private readonly ILogger<SyncService> _logger;
 
@@ -21,6 +23,7 @@ public class SyncService : ISyncService
         IRepository<UserProgress> progressRepository,
         IStravaService stravaService,
         IRouteService routeService,
+        IChallengeService challengeService,
         RideTrackerDbContext context,
         ILogger<SyncService> logger)
     {
@@ -29,6 +32,7 @@ public class SyncService : ISyncService
         _progressRepository = progressRepository;
         _stravaService = stravaService;
         _routeService = routeService;
+        _challengeService = challengeService;
         _context = context;
         _logger = logger;
     }
@@ -45,11 +49,30 @@ public class SyncService : ISyncService
         try
         {
             // Refresh token if needed
-            var tokenRefreshed = await _stravaService.RefreshTokenIfNeededAsync(user);
-            if (tokenRefreshed)
+            try
             {
-                await _userRepository.UpdateAsync(user);
-                await _userRepository.SaveChangesAsync();
+                var tokenRefreshed = await _stravaService.RefreshTokenIfNeededAsync(user);
+                if (tokenRefreshed)
+                {
+                    await _userRepository.UpdateAsync(user);
+                    await _userRepository.SaveChangesAsync();
+                }
+            }
+            catch (HttpRequestException ex) when (ex.Message.Contains("refresh_token") || ex.Message.Contains("invalid"))
+            {
+                _logger.LogWarning(
+                    "User {UserId} has invalid refresh token. User needs to re-authenticate with Strava. Error: {Error}",
+                    userId, ex.Message);
+                // Don't throw - skip this user but continue with others
+                return;
+            }
+            catch (InvalidOperationException ex) when (ex.Message.Contains("refresh token"))
+            {
+                _logger.LogWarning(
+                    "User {UserId} has no refresh token. User needs to re-authenticate with Strava. Error: {Error}",
+                    userId, ex.Message);
+                // Don't throw - skip this user but continue with others
+                return;
             }
 
             // Fetch new activities
@@ -156,6 +179,142 @@ public class SyncService : ISyncService
         }
 
         await _progressRepository.SaveChangesAsync();
+    }
+
+    public async Task SyncGroupChallengeAsync(int challengeId)
+    {
+        var challenge = await _context.Challenges
+            .Include(c => c.ParticipatingGroups)
+                .ThenInclude(cg => cg.Group)
+                    .ThenInclude(g => g.Members.Where(m => m.IsActive))
+            .FirstOrDefaultAsync(c => c.Id == challengeId && c.IsActive);
+
+        if (challenge == null || challenge.ChallengeType != "group")
+        {
+            _logger.LogWarning("Group challenge {ChallengeId} not found or invalid type", challengeId);
+            return;
+        }
+
+        _logger.LogInformation("Starting sync for group challenge {ChallengeId}", challengeId);
+
+        // Get all member IDs from participating groups
+        var memberIds = challenge.ParticipatingGroups
+            .SelectMany(cg => cg.Group.Members.Where(m => m.IsActive))
+            .Select(m => m.UserId)
+            .Distinct()
+            .ToList();
+
+        foreach (var memberId in memberIds)
+        {
+            try
+            {
+                // Sync user activities
+                await SyncUserActivitiesAsync(memberId);
+                
+                // Update challenge progress for this user
+                await _challengeService.UpdateChallengeProgressAsync(challengeId, memberId);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to sync user {UserId} for group challenge {ChallengeId}", memberId, challengeId);
+                // Continue with other users
+            }
+        }
+
+        _logger.LogInformation("Completed sync for group challenge {ChallengeId}", challengeId);
+    }
+
+    public async Task SyncInterGroupChallengeAsync(int challengeId)
+    {
+        var challenge = await _context.Challenges
+            .Include(c => c.ParticipatingGroups)
+                .ThenInclude(cg => cg.Group)
+                    .ThenInclude(g => g.Members.Where(m => m.IsActive))
+            .FirstOrDefaultAsync(c => c.Id == challengeId && c.IsActive);
+
+        if (challenge == null || challenge.ChallengeType != "inter-group")
+        {
+            _logger.LogWarning("Inter-group challenge {ChallengeId} not found or invalid type", challengeId);
+            return;
+        }
+
+        _logger.LogInformation("Starting sync for inter-group challenge {ChallengeId}", challengeId);
+
+        // Get all member IDs from all participating groups
+        var memberIds = challenge.ParticipatingGroups
+            .SelectMany(cg => cg.Group.Members.Where(m => m.IsActive))
+            .Select(m => m.UserId)
+            .Distinct()
+            .ToList();
+
+        foreach (var memberId in memberIds)
+        {
+            try
+            {
+                // Sync user activities
+                await SyncUserActivitiesAsync(memberId);
+                
+                // Update challenge progress for this user
+                await _challengeService.UpdateChallengeProgressAsync(challengeId, memberId);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to sync user {UserId} for inter-group challenge {ChallengeId}", memberId, challengeId);
+                // Continue with other users
+            }
+        }
+
+        _logger.LogInformation("Completed sync for inter-group challenge {ChallengeId}", challengeId);
+    }
+
+    public async Task SyncAllGroupChallengesAsync()
+    {
+        var groupChallenges = await _context.Challenges
+            .Where(c => c.ChallengeType == "group" && c.IsActive)
+            .Select(c => c.Id)
+            .ToListAsync();
+
+        _logger.LogInformation("Starting sync for {Count} group challenges", groupChallenges.Count);
+
+        foreach (var challengeId in groupChallenges)
+        {
+            try
+            {
+                await SyncGroupChallengeAsync(challengeId);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to sync group challenge {ChallengeId}", challengeId);
+                // Continue with other challenges
+            }
+        }
+
+        _logger.LogInformation("Completed sync for all group challenges");
+    }
+
+    public async Task SyncAllInterGroupChallengesAsync()
+    {
+        var interGroupChallenges = await _context.Challenges
+            .Where(c => c.ChallengeType == "inter-group" && c.IsActive)
+            .Select(c => c.Id)
+            .ToListAsync();
+
+        _logger.LogInformation("Starting sync for {Count} inter-group challenges", interGroupChallenges.Count);
+
+        foreach (var challengeId in interGroupChallenges)
+        {
+            try
+            {
+                await SyncInterGroupChallengeAsync(challengeId);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to sync inter-group challenge {ChallengeId}", challengeId);
+                // Continue with other challenges
+            }
+        }
+
+        _logger.LogInformation("Completed sync for all inter-group challenges");
     }
 }
 
