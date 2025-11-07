@@ -6,6 +6,7 @@ public interface IGroupService
 {
     Task<GroupDto?> GetGroupByIdAsync(int groupId);
     Task<List<GroupDto>> GetUserGroupsAsync(int userId);
+    Task<List<GroupDto>> GetAllGroupsAsync(); // For super admins to see all groups
     Task<GroupDto> CreateGroupAsync(int creatorUserId, CreateGroupDto dto);
     Task<GroupDto?> UpdateGroupAsync(int groupId, int userId, UpdateGroupDto dto);
     Task<bool> DeleteGroupAsync(int groupId, int userId);

@@ -241,11 +241,11 @@ public class ChallengeController : ControllerBase
 
     // GET: api/challenge/{id}/inter-group-leaderboard
     [HttpGet("{id}/inter-group-leaderboard")]
-    public async Task<ActionResult<InterGroupLeaderboardDto>> GetInterGroupLeaderboard(int id)
+    public async Task<ActionResult<InterGroupLeaderboardDto>> GetInterGroupLeaderboard(int id, [FromQuery] int? userId = null)
     {
         try
         {
-            var leaderboard = await _challengeService.GetInterGroupLeaderboardAsync(id);
+            var leaderboard = await _challengeService.GetInterGroupLeaderboardAsync(id, userId);
             return Ok(leaderboard);
         }
         catch (Exception ex)

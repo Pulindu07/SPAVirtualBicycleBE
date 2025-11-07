@@ -94,6 +94,43 @@ public class GroupService : IGroupService
         }).ToList();
     }
 
+    public async Task<List<GroupDto>> GetAllGroupsAsync()
+    {
+        var groups = await _context.Groups
+            .Include(g => g.CreatedBy)
+            .Include(g => g.Members)
+                .ThenInclude(m => m.User)
+            .Where(g => g.IsActive)
+            .OrderBy(g => g.Name)
+            .ToListAsync();
+
+        return groups.Select(g => new GroupDto
+        {
+            Id = g.Id,
+            Name = g.Name,
+            IconUrl = g.IconUrl,
+            CreatedByUserId = g.CreatedByUserId,
+            CreatedByUsername = g.CreatedBy.Username,
+            CreatedAt = g.CreatedAt,
+            MemberCount = g.Members.Count(m => m.IsActive),
+            Members = g.Members
+                .Where(m => m.IsActive)
+                .Select(m => new GroupMemberDto
+                {
+                    Id = m.Id,
+                    GroupId = m.GroupId,
+                    UserId = m.UserId,
+                    Username = m.User.Username,
+                    FirstName = m.User.FirstName,
+                    LastName = m.User.LastName,
+                    Role = m.Role,
+                    JoinedAt = m.JoinedAt,
+                    TotalDistanceKm = m.User.TotalDistanceKm
+                })
+                .ToList()
+        }).ToList();
+    }
+
     public async Task<GroupDto> CreateGroupAsync(int creatorUserId, CreateGroupDto dto)
     {
         // Only super admins can create groups

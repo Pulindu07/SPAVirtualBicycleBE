@@ -63,6 +63,13 @@ public class ChallengeService : IChallengeService
         if (totalDistance <= 0)
             return null;
 
+        // If distance is 0 or negative, return the first route point (start)
+        if (distanceKm <= 0)
+        {
+            var firstPoint = route.RoutePoints.OrderBy(rp => rp.OrderIndex).FirstOrDefault();
+            return firstPoint;
+        }
+
         // Calculate which route point corresponds to the distance
         // We need to find the point where cumulative distance >= distanceKm
         var orderedPoints = route.RoutePoints.OrderBy(rp => rp.OrderIndex).ToList();
@@ -85,8 +92,15 @@ public class ChallengeService : IChallengeService
                 var lat = point1.Latitude + (point2.Latitude - point1.Latitude) * localProgress;
                 var lng = point1.Longitude + (point2.Longitude - point1.Longitude) * localProgress;
                 
-                // Return the closest actual route point (point2)
-                return point2;
+                // Return interpolated route point with calculated coordinates
+                return new RoutePoint
+                {
+                    Id = point2.Id, // Use point2's ID for reference
+                    RouteId = point2.RouteId,
+                    OrderIndex = point2.OrderIndex,
+                    Latitude = lat,
+                    Longitude = lng
+                };
             }
 
             cumulativeDistance += segmentDistance;
@@ -129,6 +143,9 @@ public class ChallengeService : IChallengeService
 
     private async Task<List<ChallengeGroupDto>> GetChallengeGroupsWithProgressAsync(int challengeId)
     {
+        var challenge = await _context.Challenges.FindAsync(challengeId);
+        if (challenge == null) return new List<ChallengeGroupDto>();
+
         var challengeGroups = await _context.ChallengeGroups
             .Include(cg => cg.Group)
                 .ThenInclude(g => g.Members.Where(m => m.IsActive))
@@ -136,9 +153,8 @@ public class ChallengeService : IChallengeService
             .ToListAsync();
 
         var result = new List<ChallengeGroupDto>();
-        int rank = 1;
 
-        foreach (var cg in challengeGroups.OrderByDescending(cg => 0)) // Will calculate distance below
+        foreach (var cg in challengeGroups)
         {
             // Get all member IDs in this group
             var memberIds = cg.Group.Members.Where(m => m.IsActive).Select(m => m.UserId).ToList();
@@ -148,10 +164,12 @@ public class ChallengeService : IChallengeService
                 .Where(cp => cp.ChallengeId == challengeId && memberIds.Contains(cp.UserId))
                 .SumAsync(cp => cp.DistanceCoveredKm);
 
-            var challenge = await _context.Challenges.FindAsync(challengeId);
-            var progressPercentage = challenge!.TargetDistanceKm > 0
-                ? (totalDistance / challenge.TargetDistanceKm) * 100
+            var progressPercentage = challenge.TargetDistanceKm > 0
+                ? Math.Min((totalDistance / challenge.TargetDistanceKm) * 100, 100)
                 : 0;
+
+            // Calculate group position on route based on total distance
+            var routePoint = await GetRoutePointAtDistanceAsync(challenge.RouteId, totalDistance);
 
             result.Add(new ChallengeGroupDto
             {
@@ -162,7 +180,9 @@ public class ChallengeService : IChallengeService
                 TotalDistanceCovered = totalDistance,
                 ProgressPercentage = progressPercentage,
                 MemberCount = cg.Group.Members.Count(m => m.IsActive),
-                Rank = 0 // Will set after sorting
+                Rank = 0, // Will set after sorting
+                CurrentPositionLat = routePoint?.Latitude,
+                CurrentPositionLng = routePoint?.Longitude
             });
         }
 
@@ -200,7 +220,7 @@ public class ChallengeService : IChallengeService
             var userProgress = challenge.ProgressRecords.FirstOrDefault(p => p.UserId == userId.Value);
             totalDistance = userProgress?.DistanceCoveredKm ?? 0;
             progressPercentage = challenge.TargetDistanceKm > 0
-                ? (totalDistance / challenge.TargetDistanceKm) * 100
+                ? Math.Min((totalDistance / challenge.TargetDistanceKm) * 100, 100)
                 : 0;
         }
         else
@@ -210,7 +230,7 @@ public class ChallengeService : IChallengeService
                 .Where(p => p.ChallengeId == challengeId)
                 .Sum(p => p.DistanceCoveredKm);
             progressPercentage = challenge.TargetDistanceKm > 0
-                ? (totalDistance / challenge.TargetDistanceKm) * 100
+                ? Math.Min((totalDistance / challenge.TargetDistanceKm) * 100, 100)
                 : 0;
         }
 
@@ -231,6 +251,7 @@ public class ChallengeService : IChallengeService
             CreatedByUsername = challenge.CreatedBy.Username,
             CreatedAt = challenge.CreatedAt,
             ParticipantCount = challenge.Participants.Count(p => p.IsActive),
+            GroupCount = challenge.ParticipatingGroups.Count(cg => cg.IsActive),
             TotalDistanceCovered = totalDistance,
             ProgressPercentage = progressPercentage,
             Status = GetChallengeStatus(challenge.StartDate, challenge.EndDate),
@@ -298,6 +319,7 @@ public class ChallengeService : IChallengeService
                 CreatedByUsername = challenge.CreatedBy.Username,
                 CreatedAt = challenge.CreatedAt,
                 ParticipantCount = challenge.Participants.Count(p => p.IsActive),
+                GroupCount = challenge.ParticipatingGroups.Count(cg => cg.IsActive),
                 TotalDistanceCovered = totalDistance,
                 ProgressPercentage = progressPercentage,
                 Status = GetChallengeStatus(challenge.StartDate, challenge.EndDate),
@@ -348,13 +370,14 @@ public class ChallengeService : IChallengeService
                 RouteId = challenge.RouteId,
                 ParticipatingGroups = participatingGroups,
                 CreatedByUserId = challenge.CreatedByUserId,
-                CreatedByUsername = challenge.CreatedBy.Username,
-                CreatedAt = challenge.CreatedAt,
-                ParticipantCount = challenge.Participants.Count(p => p.IsActive),
-                TotalDistanceCovered = totalDistance,
-                ProgressPercentage = progressPercentage,
-                Status = GetChallengeStatus(challenge.StartDate, challenge.EndDate),
-                DaysRemaining = GetDaysRemaining(challenge.EndDate)
+            CreatedByUsername = challenge.CreatedBy.Username,
+            CreatedAt = challenge.CreatedAt,
+            ParticipantCount = challenge.Participants.Count(p => p.IsActive),
+            GroupCount = challenge.ParticipatingGroups.Count(cg => cg.IsActive),
+            TotalDistanceCovered = totalDistance,
+            ProgressPercentage = progressPercentage,
+            Status = GetChallengeStatus(challenge.StartDate, challenge.EndDate),
+            DaysRemaining = GetDaysRemaining(challenge.EndDate)
             });
         }
 
@@ -601,7 +624,7 @@ public class ChallengeService : IChallengeService
             var userProgress = challenge.ProgressRecords.FirstOrDefault(p => p.UserId == userId.Value);
             totalDistance = userProgress?.DistanceCoveredKm ?? 0;
             progressPercentage = challenge.TargetDistanceKm > 0
-                ? (totalDistance / challenge.TargetDistanceKm) * 100
+                ? Math.Min((totalDistance / challenge.TargetDistanceKm) * 100, 100)
                 : 0;
         }
         else
@@ -609,7 +632,7 @@ public class ChallengeService : IChallengeService
             // Inter-group: sum of all members
             totalDistance = challenge.ProgressRecords.Sum(p => p.DistanceCoveredKm);
             progressPercentage = challenge.TargetDistanceKm > 0
-                ? (totalDistance / challenge.TargetDistanceKm) * 100
+                ? Math.Min((totalDistance / challenge.TargetDistanceKm) * 100, 100)
                 : 0;
         }
 
@@ -642,7 +665,7 @@ public class ChallengeService : IChallengeService
             ChallengeName = challenge.Name,
             TargetDistanceKm = challenge.TargetDistanceKm,
             TotalDistanceCovered = totalDistance,
-            ProgressPercentage = progressPercentage,
+            ProgressPercentage = Math.Min(progressPercentage, 100),
             CurrentPositionLat = routePoint?.Latitude,
             CurrentPositionLng = routePoint?.Longitude,
             MemberProgress = memberProgress,
@@ -723,7 +746,7 @@ public class ChallengeService : IChallengeService
         };
     }
 
-    public async Task<InterGroupLeaderboardDto> GetInterGroupLeaderboardAsync(int challengeId)
+    public async Task<InterGroupLeaderboardDto> GetInterGroupLeaderboardAsync(int challengeId, int? userId = null)
     {
         var challenge = await _context.Challenges
             .FirstOrDefaultAsync(c => c.Id == challengeId && c.IsActive);
@@ -733,12 +756,65 @@ public class ChallengeService : IChallengeService
 
         var groupRankings = await GetChallengeGroupsWithProgressAsync(challengeId);
 
-        return new InterGroupLeaderboardDto
+        var result = new InterGroupLeaderboardDto
         {
             ChallengeId = challengeId,
             ChallengeName = challenge.Name,
             TargetDistanceKm = challenge.TargetDistanceKm,
             GroupRankings = groupRankings
         };
+
+        // If userId is provided, get within-group rankings for user's group
+        if (userId.HasValue)
+        {
+            // Find which group the user belongs to in this challenge
+            var userGroup = await _context.ChallengeGroups
+                .Include(cg => cg.Group)
+                    .ThenInclude(g => g.Members.Where(m => m.IsActive && m.UserId == userId.Value))
+                .Where(cg => cg.ChallengeId == challengeId && 
+                            cg.IsActive && 
+                            cg.Group.Members.Any(m => m.UserId == userId.Value && m.IsActive))
+                .FirstOrDefaultAsync();
+
+            if (userGroup != null)
+            {
+                result.UserGroupId = userGroup.GroupId;
+                result.UserGroupName = userGroup.Group.Name;
+
+                // Get all member IDs in this group
+                var memberIds = await _context.GroupMembers
+                    .Where(gm => gm.GroupId == userGroup.GroupId && gm.IsActive)
+                    .Select(gm => gm.UserId)
+                    .ToListAsync();
+
+                // Get progress for all members in this group for this challenge
+                var memberProgressList = await _context.ChallengeProgress
+                    .Include(cp => cp.User)
+                    .Where(cp => cp.ChallengeId == challengeId && memberIds.Contains(cp.UserId))
+                    .OrderByDescending(cp => cp.DistanceCoveredKm)
+                    .ToListAsync();
+
+                var memberProgress = memberProgressList
+                    .Select((cp, index) => new LeaderboardEntryDto
+                    {
+                        Rank = index + 1,
+                        UserId = cp.UserId,
+                        Username = cp.User.Username,
+                        FirstName = cp.User.FirstName,
+                        LastName = cp.User.LastName,
+                        DistanceCoveredKm = cp.DistanceCoveredKm,
+                        ProgressPercentage = cp.ProgressPercentage,
+                        LastActivityDate = cp.LastActivityDate,
+                        IsCurrentUser = cp.UserId == userId.Value,
+                        CurrentPositionLat = cp.CurrentPositionLat,
+                        CurrentPositionLng = cp.CurrentPositionLng
+                    })
+                    .ToList();
+
+                result.UserGroupMemberRankings = memberProgress;
+            }
+        }
+
+        return result;
     }
 }
