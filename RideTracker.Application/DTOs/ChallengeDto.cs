@@ -15,6 +15,7 @@ public class ChallengeDto
     public string CreatedByUsername { get; set; } = string.Empty;
     public DateTime CreatedAt { get; set; }
     public int ParticipantCount { get; set; }
+    public int GroupCount { get; set; } // Number of participating groups (for inter-group challenges)
     public double TotalDistanceCovered { get; set; }
     public double ProgressPercentage { get; set; }
     public string Status { get; set; } = string.Empty; // "upcoming", "in_progress", "completed"

@@ -24,6 +24,6 @@ public interface IChallengeService
     
     // Leaderboard
     Task<LeaderboardDto> GetChallengeLeaderboardAsync(int challengeId, int? currentUserId = null);
-    Task<InterGroupLeaderboardDto> GetInterGroupLeaderboardAsync(int challengeId);
+    Task<InterGroupLeaderboardDto> GetInterGroupLeaderboardAsync(int challengeId, int? userId = null);
 }
 

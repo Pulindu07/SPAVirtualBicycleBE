@@ -9,11 +9,16 @@ namespace RideTracker.API.Controllers;
 public class GroupController : ControllerBase
 {
     private readonly IGroupService _groupService;
+    private readonly IUserService _userService;
     private readonly ILogger<GroupController> _logger;
 
-    public GroupController(IGroupService groupService, ILogger<GroupController> logger)
+    public GroupController(
+        IGroupService groupService, 
+        IUserService userService,
+        ILogger<GroupController> logger)
     {
         _groupService = groupService;
+        _userService = userService;
         _logger = logger;
     }
 
@@ -49,6 +54,27 @@ public class GroupController : ControllerBase
         {
             _logger.LogError(ex, "Error getting groups for user {UserId}", userId);
             return StatusCode(500, new { message = "An error occurred while retrieving user groups" });
+        }
+    }
+
+    // GET: api/group/all
+    [HttpGet("all")]
+    public async Task<ActionResult<List<GroupDto>>> GetAllGroups([FromQuery] int userId)
+    {
+        try
+        {
+            // Verify user is super admin
+            var user = await _userService.GetUserDtoByIdAsync(userId);
+            if (user == null || !user.IsSuperAdmin)
+                return Unauthorized(new { message = "Only super admins can view all groups" });
+
+            var groups = await _groupService.GetAllGroupsAsync();
+            return Ok(groups);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting all groups");
+            return StatusCode(500, new { message = "An error occurred while retrieving all groups" });
         }
     }
 
