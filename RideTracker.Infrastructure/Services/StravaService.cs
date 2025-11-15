@@ -19,20 +19,20 @@ public class StravaService : IStravaService
     {
         _httpClient = httpClient;
         _configuration = configuration;
-        
+
         // Environment variables take precedence over appsettings.json
         _clientId = Environment.GetEnvironmentVariable("STRAVA_CLIENT_ID")
-                    ?? configuration["Strava:ClientId"] 
+                    ?? configuration["Strava:ClientId"]
                     ?? throw new InvalidOperationException("Strava ClientId not configured. Set STRAVA_CLIENT_ID env var or Strava:ClientId in appsettings.json");
-        
+
         _clientSecret = Environment.GetEnvironmentVariable("STRAVA_CLIENT_SECRET")
-                        ?? configuration["Strava:ClientSecret"] 
+                        ?? configuration["Strava:ClientSecret"]
                         ?? throw new InvalidOperationException("Strava ClientSecret not configured. Set STRAVA_CLIENT_SECRET env var or Strava:ClientSecret in appsettings.json");
-        
+
         _redirectUri = Environment.GetEnvironmentVariable("STRAVA_REDIRECT_URI")
-                       ?? configuration["Strava:RedirectUri"] 
+                       ?? configuration["Strava:RedirectUri"]
                        ?? throw new InvalidOperationException("Strava RedirectUri not configured. Set STRAVA_REDIRECT_URI env var or Strava:RedirectUri in appsettings.json");
-        
+
         _httpClient.BaseAddress = new Uri("https://www.strava.com/api/v3/");
     }
 
@@ -59,7 +59,7 @@ public class StravaService : IStravaService
             AccessToken = result.GetProperty("access_token").GetString() ?? string.Empty,
             RefreshToken = result.GetProperty("refresh_token").GetString() ?? string.Empty,
             ExpiresIn = result.GetProperty("expires_in").GetInt32(),
-            ExpiresAt = result.GetProperty("expires_at").GetInt64() > 0 
+            ExpiresAt = result.GetProperty("expires_at").GetInt64() > 0
                 ? DateTime.SpecifyKind(DateTimeOffset.FromUnixTimeSeconds(result.GetProperty("expires_at").GetInt64()).DateTime, DateTimeKind.Utc)
                 : DateTime.UtcNow.AddSeconds(result.GetProperty("expires_in").GetInt32()),
             Athlete = new StravaAthleteDto
@@ -96,7 +96,7 @@ public class StravaService : IStravaService
             AccessToken = result.GetProperty("access_token").GetString() ?? string.Empty,
             RefreshToken = result.GetProperty("refresh_token").GetString() ?? string.Empty,
             ExpiresIn = result.GetProperty("expires_in").GetInt32(),
-            ExpiresAt = result.GetProperty("expires_at").GetInt64() > 0 
+            ExpiresAt = result.GetProperty("expires_at").GetInt64() > 0
                 ? DateTime.SpecifyKind(DateTimeOffset.FromUnixTimeSeconds(result.GetProperty("expires_at").GetInt64()).DateTime, DateTimeKind.Utc)
                 : DateTime.UtcNow.AddSeconds(result.GetProperty("expires_in").GetInt32())
         };
@@ -107,9 +107,9 @@ public class StravaService : IStravaService
         // Create a request message to avoid modifying shared DefaultRequestHeaders
         var request = new HttpRequestMessage(HttpMethod.Get, $"athlete/activities?after={new DateTimeOffset(after).ToUnixTimeSeconds()}&per_page=200");
         request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", accessToken);
-        
+
         var response = await _httpClient.SendAsync(request);
-        
+
         response.EnsureSuccessStatusCode();
         var activities = await response.Content.ReadFromJsonAsync<JsonElement[]>();
 
@@ -121,8 +121,9 @@ public class StravaService : IStravaService
             MovingTime = a.GetProperty("moving_time").GetInt64(),
             StartDate = a.GetProperty("start_date").GetDateTime(),
             AverageSpeed = a.TryGetProperty("average_speed", out var avgSpeed) ? avgSpeed.GetDouble() : 0,
-            SportType = a.TryGetProperty("sport_type", out var sportType) ? sportType.GetString() ?? string.Empty : string.Empty
-        }).Where(a => a.Distance > 0 && a.SportType.Contains("Ride", StringComparison.OrdinalIgnoreCase)).ToList() ?? new List<StravaActivityDto>();
+            Type = a.TryGetProperty("type", out var type) ? type.GetString() ?? string.Empty : string.Empty,
+            Manual = a.TryGetProperty("manual", out var manual) ? manual.GetBoolean() : false
+        }).Where(a => a.Distance > 0 && a.Type.Equals("Ride", StringComparison.OrdinalIgnoreCase) && !a.Manual).ToList() ?? new List<StravaActivityDto>();
     }
 
     public async Task<bool> RefreshTokenIfNeededAsync(User user)
