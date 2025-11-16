@@ -386,15 +386,35 @@ public class ChallengeService : IChallengeService
 
     public async Task<ChallengeDto> CreateChallengeAsync(int creatorUserId, CreateChallengeDto dto)
     {
-        // Only super admins can create challenges
         var creator = await _context.Users.FindAsync(creatorUserId);
-        if (creator == null || !creator.IsSuperAdmin)
-            throw new UnauthorizedAccessException("Only super admins can create challenges");
+        if (creator == null)
+            throw new UnauthorizedAccessException("User not found");
+
+        // Only super admins can create group or inter-group challenges
+        // Regular users can create individual challenges
+        if ((dto.ChallengeType == "group" || dto.ChallengeType == "inter-group") && !creator.IsSuperAdmin)
+            throw new UnauthorizedAccessException("Only super admins can create group or inter-group challenges");
 
         // Validate groups if it's a group or inter-group challenge
         if ((dto.ChallengeType == "group" || dto.ChallengeType == "inter-group") && dto.GroupIds.Count == 0)
             throw new InvalidOperationException("Group or inter-group challenges must have at least one group");
 
+        if(dto.ChallengeType == "individual")
+        {
+            var existingIndividualChallenge = await _context.ChallengeParticipants
+                .Include(cp => cp.Challenge)
+                .FirstOrDefaultAsync(cp => cp.UserId == creatorUserId && cp.IsActive && cp.Challenge.IsActive && cp.Challenge.ChallengeType == "individual" && cp.Challenge.StartDate <= DateTime.UtcNow && cp.Challenge.EndDate >= DateTime.UtcNow);
+            if(existingIndividualChallenge != null)
+                throw new InvalidOperationException("User can only belong to one active in-progress individual challenge at a time");
+        }
+        else if(dto.ChallengeType == "group")
+        {
+            var existingGroupChallenge = await _context.ChallengeGroups
+                .Include(cg => cg.Challenge)
+                .FirstOrDefaultAsync(cg => cg.GroupId == dto.GroupIds[0] && cg.IsActive && cg.Challenge.IsActive && cg.Challenge.ChallengeType == "group" && cg.Challenge.StartDate <= DateTime.UtcNow && cg.Challenge.EndDate >= DateTime.UtcNow);
+            if(existingGroupChallenge != null)
+                throw new InvalidOperationException("Group can only belong to one active in-progress group challenge at a time");
+        }
         var challenge = new Challenge
         {
             Name = dto.Name,
@@ -428,7 +448,13 @@ public class ChallengeService : IChallengeService
         await _context.SaveChangesAsync();
 
         // Auto-join creator to the challenge
-        await JoinChallengeAsync(challenge.Id, creatorUserId);
+        var creatorJoinResult = await JoinChallengeAsync(challenge.Id, creatorUserId);
+        if (!creatorJoinResult.Success)
+        {
+            // Log warning but continue - creator should always be able to join their own challenge
+            // This shouldn't happen, but handle gracefully
+            throw new InvalidOperationException($"Failed to auto-join creator to challenge: {creatorJoinResult.ErrorMessage}");
+        }
 
         // If it's a group or inter-group challenge, auto-join all members of participating groups
         if (dto.ChallengeType == "group" || dto.ChallengeType == "inter-group")
@@ -442,7 +468,13 @@ public class ChallengeService : IChallengeService
 
                 foreach (var memberId in groupMembers)
                 {
-                    await JoinChallengeAsync(challenge.Id, memberId);
+                    var memberJoinResult = await JoinChallengeAsync(challenge.Id, memberId);
+                    // Log but continue - some members might already be in an individual challenge
+                    if (!memberJoinResult.Success)
+                    {
+                        // Continue with other members even if one fails
+                        // This allows group challenges to proceed even if some members can't join
+                    }
                 }
             }
         }
@@ -491,10 +523,32 @@ public class ChallengeService : IChallengeService
         return true;
     }
 
-    public async Task<bool> JoinChallengeAsync(int challengeId, int userId)
+    public async Task<JoinChallengeResult> JoinChallengeAsync(int challengeId, int userId)
     {
         var challenge = await _context.Challenges.FindAsync(challengeId);
-        if (challenge == null || !challenge.IsActive) return false;
+        if (challenge == null || !challenge.IsActive) 
+            return JoinChallengeResult.CreateFailure("Challenge not found or is not active");
+
+        // If this is an individual challenge, check if user already has an active in-progress individual challenge
+        if (challenge.ChallengeType == "individual")
+        {
+            var now = DateTime.UtcNow;
+            var existingIndividualChallenge = await _context.ChallengeParticipants
+                .Include(cp => cp.Challenge)
+                .Where(cp => cp.UserId == userId && 
+                            cp.IsActive && 
+                            cp.Challenge.IsActive &&
+                            cp.Challenge.ChallengeType == "individual" &&
+                            cp.Challenge.StartDate <= now &&
+                            cp.Challenge.EndDate >= now &&
+                            cp.ChallengeId != challengeId)
+                .FirstOrDefaultAsync();
+
+            if (existingIndividualChallenge != null)
+            {
+                return JoinChallengeResult.CreateFailure("User can only belong to one active in-progress individual challenge at a time");
+            }
+        }
 
         // Check if already a participant
         var existingParticipant = await _context.ChallengeParticipants
@@ -502,7 +556,8 @@ public class ChallengeService : IChallengeService
 
         if (existingParticipant != null)
         {
-            if (existingParticipant.IsActive) return false;
+            if (existingParticipant.IsActive) 
+                return JoinChallengeResult.CreateFailure("User is already a participant in this challenge");
 
             // Reactivate
             existingParticipant.IsActive = true;
@@ -538,7 +593,7 @@ public class ChallengeService : IChallengeService
         }
 
         await _context.SaveChangesAsync();
-        return true;
+        return JoinChallengeResult.CreateSuccess();
     }
 
     public async Task<bool> LeaveChallengeAsync(int challengeId, int userId)

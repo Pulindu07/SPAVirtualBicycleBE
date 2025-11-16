@@ -86,6 +86,10 @@ public class ChallengeController : ControllerBase
         {
             return Unauthorized(new { message = ex.Message });
         }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error creating challenge");
@@ -138,8 +142,8 @@ public class ChallengeController : ControllerBase
         try
         {
             var result = await _challengeService.JoinChallengeAsync(id, request.UserId);
-            if (!result)
-                return BadRequest(new { message = "Unable to join challenge" });
+            if (!result.Success)
+                return BadRequest(new { message = result.ErrorMessage ?? "Unable to join challenge" });
 
             return Ok(new { message = "Successfully joined challenge" });
         }

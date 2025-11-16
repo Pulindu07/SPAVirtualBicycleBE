@@ -42,3 +42,12 @@ public class UpdateChallengeDto
     public DateTime? EndDate { get; set; }
 }
 
+public class JoinChallengeResult
+{
+    public bool Success { get; set; }
+    public string? ErrorMessage { get; set; }
+
+    public static JoinChallengeResult CreateSuccess() => new JoinChallengeResult { Success = true };
+    public static JoinChallengeResult CreateFailure(string errorMessage) => new JoinChallengeResult { Success = false, ErrorMessage = errorMessage };
+}
+

@@ -13,7 +13,7 @@ public interface IChallengeService
     Task<bool> DeleteChallengeAsync(int challengeId, int userId);
     
     // Challenge Participation
-    Task<bool> JoinChallengeAsync(int challengeId, int userId);
+    Task<JoinChallengeResult> JoinChallengeAsync(int challengeId, int userId);
     Task<bool> LeaveChallengeAsync(int challengeId, int userId);
     Task<List<int>> GetChallengeParticipantIdsAsync(int challengeId);
     
