@@ -123,7 +123,7 @@ public class StravaService : IStravaService
             AverageSpeed = a.TryGetProperty("average_speed", out var avgSpeed) ? avgSpeed.GetDouble() : 0,
             Type = a.TryGetProperty("type", out var type) ? type.GetString() ?? string.Empty : string.Empty,
             Manual = a.TryGetProperty("manual", out var manual) ? manual.GetBoolean() : false
-        }).Where(a => a.Distance > 0 && a.Type.Equals("Ride", StringComparison.OrdinalIgnoreCase) && !a.Manual).ToList() ?? new List<StravaActivityDto>();
+        }).Where(a => a.Distance > 0 && a.Type.Equals("Ride", StringComparison.OrdinalIgnoreCase)).ToList() ?? new List<StravaActivityDto>();
     }
 
     public async Task<bool> RefreshTokenIfNeededAsync(User user)
