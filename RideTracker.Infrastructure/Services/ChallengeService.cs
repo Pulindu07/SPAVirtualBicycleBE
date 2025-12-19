@@ -127,20 +127,15 @@ public class ChallengeService : IChallengeService
         return degrees * Math.PI / 180.0;
     }
 
-    private string GetChallengeStatus(DateTime startDate, DateTime endDate)
+    private string GetChallengeStatus(DateTime startDate, DateTime endDate, double progressPercentage)
     {
         var now = DateTime.UtcNow;
         if (now < startDate) return "upcoming";
-        if (now > endDate) return "completed";
+        if (progressPercentage >= 100) return "completed";
+        if (endDate < now && progressPercentage < 100) return "not_completed";
         return "in_progress";
     }
-
-    private int GetDaysRemaining(DateTime endDate)
-    {
-        var remaining = (endDate - DateTime.UtcNow).Days;
-        return remaining > 0 ? remaining : 0;
-    }
-
+    
     private async Task<List<ChallengeGroupDto>> GetChallengeGroupsWithProgressAsync(int challengeId)
     {
         var challenge = await _context.Challenges.FindAsync(challengeId);
@@ -254,7 +249,7 @@ public class ChallengeService : IChallengeService
             GroupCount = challenge.ParticipatingGroups.Count(cg => cg.IsActive),
             TotalDistanceCovered = totalDistance,
             ProgressPercentage = progressPercentage,
-            Status = GetChallengeStatus(challenge.StartDate, challenge.EndDate),
+            Status = GetChallengeStatus(challenge.StartDate, challenge.EndDate, progressPercentage),
             DaysRemaining = GetDaysRemaining(challenge.EndDate)
         };
     }
@@ -322,7 +317,7 @@ public class ChallengeService : IChallengeService
                 GroupCount = challenge.ParticipatingGroups.Count(cg => cg.IsActive),
                 TotalDistanceCovered = totalDistance,
                 ProgressPercentage = progressPercentage,
-                Status = GetChallengeStatus(challenge.StartDate, challenge.EndDate),
+                Status = GetChallengeStatus(challenge.StartDate, challenge.EndDate, progressPercentage),
                 DaysRemaining = GetDaysRemaining(challenge.EndDate)
             });
         }
@@ -376,7 +371,7 @@ public class ChallengeService : IChallengeService
             GroupCount = challenge.ParticipatingGroups.Count(cg => cg.IsActive),
             TotalDistanceCovered = totalDistance,
             ProgressPercentage = progressPercentage,
-            Status = GetChallengeStatus(challenge.StartDate, challenge.EndDate),
+            Status = GetChallengeStatus(challenge.StartDate, challenge.EndDate, progressPercentage),
             DaysRemaining = GetDaysRemaining(challenge.EndDate)
             });
         }
@@ -736,6 +731,7 @@ public class ChallengeService : IChallengeService
             .FirstOrDefaultAsync(cp => cp.ChallengeId == challengeId && cp.UserId == userId);
 
         if (progress == null) return;
+        if (progress.ProgressPercentage >= 100) return;
 
         // Get user's activities within the challenge date range
         var challenge = progress.Challenge;
