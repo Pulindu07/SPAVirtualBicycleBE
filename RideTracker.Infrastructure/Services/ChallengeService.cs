@@ -135,6 +135,11 @@ public class ChallengeService : IChallengeService
         if (endDate < now && progressPercentage < 100) return "not_completed";
         return "in_progress";
     }
+    private int GetDaysRemaining(DateTime endDate)
+    {
+        var remaining = (endDate - DateTime.UtcNow).Days;
+        return remaining > 0 ? remaining : 0;
+    }
     
     private async Task<List<ChallengeGroupDto>> GetChallengeGroupsWithProgressAsync(int challengeId)
     {
