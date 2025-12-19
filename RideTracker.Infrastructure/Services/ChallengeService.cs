@@ -165,7 +165,7 @@ public class ChallengeService : IChallengeService
                 .SumAsync(cp => cp.DistanceCoveredKm);
 
             var progressPercentage = challenge.TargetDistanceKm > 0
-                ? Math.Min((totalDistance / challenge.TargetDistanceKm) * 100, 100)
+                ? Math.Min(totalDistance / challenge.TargetDistanceKm * 100, 100)
                 : 0;
 
             // Calculate group position on route based on total distance
@@ -220,7 +220,7 @@ public class ChallengeService : IChallengeService
             var userProgress = challenge.ProgressRecords.FirstOrDefault(p => p.UserId == userId.Value);
             totalDistance = userProgress?.DistanceCoveredKm ?? 0;
             progressPercentage = challenge.TargetDistanceKm > 0
-                ? Math.Min((totalDistance / challenge.TargetDistanceKm) * 100, 100)
+                ? Math.Min(totalDistance / challenge.TargetDistanceKm * 100, 100)
                 : 0;
         }
         else
@@ -230,7 +230,7 @@ public class ChallengeService : IChallengeService
                 .Where(p => p.ChallengeId == challengeId)
                 .Sum(p => p.DistanceCoveredKm);
             progressPercentage = challenge.TargetDistanceKm > 0
-                ? Math.Min((totalDistance / challenge.TargetDistanceKm) * 100, 100)
+                ? Math.Min(totalDistance / challenge.TargetDistanceKm * 100, 100)
                 : 0;
         }
 
@@ -290,7 +290,7 @@ public class ChallengeService : IChallengeService
                 var userProgress = challenge.ProgressRecords.FirstOrDefault(p => p.UserId == userId);
                 totalDistance = userProgress?.DistanceCoveredKm ?? 0;
                 progressPercentage = challenge.TargetDistanceKm > 0
-                    ? (totalDistance / challenge.TargetDistanceKm) * 100
+                    ? Math.Min(totalDistance / challenge.TargetDistanceKm * 100, 100)
                     : 0;
             }
             else
@@ -298,7 +298,7 @@ public class ChallengeService : IChallengeService
                 // Individual or inter-group: sum of all members
                 totalDistance = challenge.ProgressRecords.Sum(p => p.DistanceCoveredKm);
                 progressPercentage = challenge.TargetDistanceKm > 0
-                    ? (totalDistance / challenge.TargetDistanceKm) * 100
+                    ? Math.Min(totalDistance / challenge.TargetDistanceKm * 100, 100)
                     : 0;
             }
 
@@ -353,7 +353,7 @@ public class ChallengeService : IChallengeService
         {
             var totalDistance = challenge.ProgressRecords.Sum(p => p.DistanceCoveredKm);
             var progressPercentage = challenge.TargetDistanceKm > 0
-                ? (totalDistance / challenge.TargetDistanceKm) * 100
+                ? Math.Min(totalDistance / challenge.TargetDistanceKm * 100, 100)
                 : 0;
 
             var participatingGroups = await GetChallengeGroupsWithProgressAsync(challenge.Id);
@@ -679,7 +679,7 @@ public class ChallengeService : IChallengeService
             var userProgress = challenge.ProgressRecords.FirstOrDefault(p => p.UserId == userId.Value);
             totalDistance = userProgress?.DistanceCoveredKm ?? 0;
             progressPercentage = challenge.TargetDistanceKm > 0
-                ? Math.Min((totalDistance / challenge.TargetDistanceKm) * 100, 100)
+                ? Math.Min(totalDistance / challenge.TargetDistanceKm * 100, 100)
                 : 0;
         }
         else
@@ -687,7 +687,7 @@ public class ChallengeService : IChallengeService
             // Inter-group: sum of all members
             totalDistance = challenge.ProgressRecords.Sum(p => p.DistanceCoveredKm);
             progressPercentage = challenge.TargetDistanceKm > 0
-                ? Math.Min((totalDistance / challenge.TargetDistanceKm) * 100, 100)
+                ? Math.Min(totalDistance / challenge.TargetDistanceKm * 100, 100)
                 : 0;
         }
 
@@ -747,7 +747,7 @@ public class ChallengeService : IChallengeService
 
         var totalDistance = activities.Sum(a => a.DistanceKm);
         var progressPercentage = challenge.TargetDistanceKm > 0
-            ? (totalDistance / challenge.TargetDistanceKm) * 100
+            ? Math.Min(totalDistance / challenge.TargetDistanceKm * 100, 100)
             : 0;
 
         // Calculate position on route
