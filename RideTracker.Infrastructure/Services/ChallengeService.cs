@@ -404,7 +404,21 @@ public class ChallengeService : IChallengeService
             var existingIndividualChallenge = await _context.ChallengeParticipants
                 .Include(cp => cp.Challenge)
                 .FirstOrDefaultAsync(cp => cp.UserId == creatorUserId && cp.IsActive && cp.Challenge.IsActive && cp.Challenge.ChallengeType == "individual" && cp.Challenge.StartDate <= DateTime.UtcNow && cp.Challenge.EndDate >= DateTime.UtcNow);
+            
+            var completed = false;
+
             if(existingIndividualChallenge != null)
+            {
+                var completedChallenges = await _context.ChallengeProgress
+                .FirstOrDefaultAsync(cp => cp.Challenge.Id == existingIndividualChallenge.ChallengeId && cp.ProgressPercentage >= 100);    
+
+                if(completedChallenges != null)
+                {
+                 completed = true;      
+                }
+            }
+
+            if(existingIndividualChallenge != null && !completed)
                 throw new InvalidOperationException("User can only belong to one active in-progress individual challenge at a time");
         }
         else if(dto.ChallengeType == "group")
