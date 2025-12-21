@@ -557,8 +557,21 @@ public class ChallengeService : IChallengeService
                             cp.Challenge.EndDate >= now &&
                             cp.ChallengeId != challengeId)
                 .FirstOrDefaultAsync();
+            
+            var completed = false;
 
-            if (existingIndividualChallenge != null)
+            if(existingIndividualChallenge != null)
+            {
+                var completedChallenges = await _context.ChallengeProgress
+                .FirstOrDefaultAsync(cp => cp.Challenge.Id == existingIndividualChallenge.ChallengeId && cp.ProgressPercentage >= 100);    
+
+                if(completedChallenges != null)
+                {
+                 completed = true;      
+                }
+            }
+
+            if (existingIndividualChallenge != null && !completed)
             {
                 return JoinChallengeResult.CreateFailure("User can only belong to one active in-progress individual challenge at a time");
             }
