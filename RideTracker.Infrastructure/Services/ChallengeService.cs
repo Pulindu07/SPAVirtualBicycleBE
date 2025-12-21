@@ -273,6 +273,7 @@ public class ChallengeService : IChallengeService
             .Include(c => c.Participants)
             .Include(c => c.ProgressRecords)
             .Where(c => challengeIds.Contains(c.Id) && c.IsActive)
+            .OrderByDescending(c => c.CreatedAt)
             .ToListAsync();
 
         var result = new List<ChallengeDto>();
