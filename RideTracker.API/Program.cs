@@ -49,6 +49,8 @@ builder.Services.AddScoped(typeof(IRepository<>), typeof(Repository<>));
 
 // Register services
 builder.Services.AddHttpClient<IStravaService, StravaService>();
+builder.Services.AddHttpClient<IStravaWebhookService, StravaWebhookService>();
+builder.Services.AddScoped<IStravaWebhookProcessor, StravaWebhookProcessor>();
 
 // Route Generation Service - Choose one:
 // Option 1: Google Maps Directions API (recommended for production - better accuracy)
@@ -112,23 +114,22 @@ using (var scope = app.Services.CreateScope())
     }
 }
 
-// Configure recurring job for syncing activities every 2 hours
+// Webhooks are the primary sync path. These daily jobs are a safety net
+// to backfill anything missed during webhook outages.
 RecurringJob.AddOrUpdate<ISyncService>(
     "sync-all-users",
     service => service.SyncAllUsersAsync(),
-    "0 */2 * * *"); // Every 2 hours
+    "0 3 * * *"); // Daily at 03:00 UTC
 
-// Configure recurring job for syncing group challenges every 2 hours
 RecurringJob.AddOrUpdate<ISyncService>(
     "sync-all-group-challenges",
     service => service.SyncAllGroupChallengesAsync(),
-    "0 */2 * * *"); // Every 2 hours
+    "0 3 * * *"); // Daily at 03:00 UTC
 
-// Configure recurring job for syncing inter-group challenges every 2 hours
 RecurringJob.AddOrUpdate<ISyncService>(
     "sync-all-inter-group-challenges",
     service => service.SyncAllInterGroupChallengesAsync(),
-    "0 */2 * * *"); // Every 2 hours
+    "0 3 * * *"); // Daily at 03:00 UTC
 
 Console.WriteLine("RideTracker API is running...");
 

@@ -77,35 +77,53 @@ public class SyncService : ISyncService
 
             // Fetch new activities
             var newActivities = await _stravaService.GetActivitiesAfterAsync(user.AccessToken, user.LastSync);
-            
+
             _logger.LogInformation("Found {Count} new activities for user {UserId}", newActivities.Count, userId);
 
             if (newActivities.Any())
             {
-                // Save new activities
-                var activities = newActivities.Select(a => new Activity
+                // Upsert: webhooks may have already inserted some of these. Skip existing IDs.
+                var incomingIds = newActivities.Select(a => a.Id).ToList();
+                var existingIds = await _context.Activities
+                    .Where(a => a.UserId == user.Id && incomingIds.Contains(a.Id))
+                    .Select(a => a.Id)
+                    .ToListAsync();
+
+                var toInsert = newActivities
+                    .Where(a => !existingIds.Contains(a.Id))
+                    .Select(a => new Activity
+                    {
+                        Id = a.Id,
+                        UserId = user.Id,
+                        Name = a.Name,
+                        DistanceKm = a.Distance / 1000.0,
+                        MovingTimeSec = a.MovingTime,
+                        StartDate = DateTime.SpecifyKind(a.StartDate, DateTimeKind.Utc),
+                        AverageSpeed = a.AverageSpeed,
+                        CreatedAt = DateTime.UtcNow
+                    })
+                    .ToList();
+
+                if (toInsert.Any())
                 {
-                    Id = a.Id,
-                    UserId = user.Id,
-                    Name = a.Name,
-                    DistanceKm = a.Distance / 1000.0, // Convert meters to km
-                    MovingTimeSec = a.MovingTime,
-                    StartDate = DateTime.SpecifyKind(a.StartDate, DateTimeKind.Utc),
-                    AverageSpeed = a.AverageSpeed,
-                    CreatedAt = DateTime.UtcNow
-                }).ToList();
-
-                await _activityRepository.AddRangeAsync(activities);
-                await _activityRepository.SaveChangesAsync();
-
-                // Update user totals
-                var additionalDistance = activities.Sum(a => a.DistanceKm);
-                var additionalTime = activities.Sum(a => a.MovingTimeSec);
-                
-                user.TotalDistanceKm += additionalDistance;
-                user.TotalMovingTimeSec += additionalTime;
+                    await _activityRepository.AddRangeAsync(toInsert);
+                    await _activityRepository.SaveChangesAsync();
+                }
             }
 
+            // Recompute totals from the activities table to stay consistent with webhook upserts.
+            var totals = await _context.Activities
+                .Where(a => a.UserId == user.Id)
+                .GroupBy(a => a.UserId)
+                .Select(g => new
+                {
+                    Distance = g.Sum(a => a.DistanceKm),
+                    Time = g.Sum(a => a.MovingTimeSec)
+                })
+                .FirstOrDefaultAsync();
+
+            user.TotalDistanceKm = totals?.Distance ?? 0;
+            user.TotalMovingTimeSec = totals?.Time ?? 0;
             user.LastSync = DateTime.UtcNow;
             await _userRepository.UpdateAsync(user);
             await _userRepository.SaveChangesAsync();
