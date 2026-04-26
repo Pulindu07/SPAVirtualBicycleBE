@@ -126,6 +126,41 @@ public class StravaService : IStravaService
         }).Where(a => a.Distance > 0 && a.Type.Equals("Ride", StringComparison.OrdinalIgnoreCase) && !a.Manual).ToList() ?? new List<StravaActivityDto>();
     }
 
+    public async Task<StravaActivityDto?> GetActivityByIdAsync(string accessToken, long activityId)
+    {
+        var request = new HttpRequestMessage(HttpMethod.Get, $"activities/{activityId}");
+        request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", accessToken);
+
+        var response = await _httpClient.SendAsync(request);
+
+        if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
+        {
+            return null;
+        }
+
+        response.EnsureSuccessStatusCode();
+        var a = await response.Content.ReadFromJsonAsync<JsonElement>();
+
+        var dto = new StravaActivityDto
+        {
+            Id = a.GetProperty("id").GetInt64(),
+            Name = a.TryGetProperty("name", out var name) ? name.GetString() ?? string.Empty : string.Empty,
+            Distance = a.GetProperty("distance").GetDouble(),
+            MovingTime = a.GetProperty("moving_time").GetInt64(),
+            StartDate = a.GetProperty("start_date").GetDateTime(),
+            AverageSpeed = a.TryGetProperty("average_speed", out var avgSpeed) ? avgSpeed.GetDouble() : 0,
+            Type = a.TryGetProperty("type", out var type) ? type.GetString() ?? string.Empty : string.Empty,
+            Manual = a.TryGetProperty("manual", out var manual) && manual.GetBoolean()
+        };
+
+        if (dto.Distance <= 0 || !dto.Type.Equals("Ride", StringComparison.OrdinalIgnoreCase) || dto.Manual)
+        {
+            return null;
+        }
+
+        return dto;
+    }
+
     public async Task<bool> RefreshTokenIfNeededAsync(User user)
     {
         if (string.IsNullOrWhiteSpace(user.RefreshToken))

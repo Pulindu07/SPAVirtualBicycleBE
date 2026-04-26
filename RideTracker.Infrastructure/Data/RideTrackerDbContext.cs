@@ -20,6 +20,7 @@ public class RideTrackerDbContext : DbContext
     public DbSet<ChallengeGroup> ChallengeGroups { get; set; }
     public DbSet<ChallengeParticipant> ChallengeParticipants { get; set; }
     public DbSet<ChallengeProgress> ChallengeProgress { get; set; }
+    public DbSet<StravaWebhookEvent> StravaWebhookEvents { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -260,6 +261,30 @@ public class RideTrackerDbContext : DbContext
                 .OnDelete(DeleteBehavior.Cascade);
             
             entity.HasIndex(e => new { e.ChallengeId, e.UserId }).IsUnique();
+        });
+
+        // StravaWebhookEvent Configuration
+        modelBuilder.Entity<StravaWebhookEvent>(entity =>
+        {
+            entity.ToTable("strava_webhook_events");
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Id).HasColumnName("id");
+            entity.Property(e => e.SubscriptionId).HasColumnName("subscription_id").IsRequired();
+            entity.Property(e => e.ObjectType).HasColumnName("object_type").HasMaxLength(50).IsRequired();
+            entity.Property(e => e.ObjectId).HasColumnName("object_id").IsRequired();
+            entity.Property(e => e.AspectType).HasColumnName("aspect_type").HasMaxLength(50).IsRequired();
+            entity.Property(e => e.OwnerId).HasColumnName("owner_id").IsRequired();
+            entity.Property(e => e.EventTime).HasColumnName("event_time").IsRequired();
+            entity.Property(e => e.ReceivedAt).HasColumnName("received_at").HasDefaultValueSql("NOW()");
+            entity.Property(e => e.ProcessedAt).HasColumnName("processed_at");
+            entity.Property(e => e.Status).HasColumnName("status").HasMaxLength(20).HasDefaultValue("pending");
+            entity.Property(e => e.ErrorMessage).HasColumnName("error_message");
+            entity.Property(e => e.PayloadJson).HasColumnName("payload_json").IsRequired();
+
+            entity.HasIndex(e => new { e.ObjectType, e.ObjectId, e.AspectType, e.EventTime })
+                  .HasDatabaseName("ix_strava_webhook_events_dedup");
+            entity.HasIndex(e => e.OwnerId).HasDatabaseName("ix_strava_webhook_events_owner_id");
+            entity.HasIndex(e => e.Status).HasDatabaseName("ix_strava_webhook_events_status");
         });
     }
 }

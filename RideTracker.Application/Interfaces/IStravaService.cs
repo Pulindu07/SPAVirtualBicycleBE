@@ -9,6 +9,7 @@ public interface IStravaService
     Task<StravaTokenDto> ExchangeCodeForTokenAsync(string code);
     Task<StravaTokenDto> RefreshTokenAsync(string refreshToken);
     Task<List<StravaActivityDto>> GetActivitiesAfterAsync(string accessToken, DateTime after);
+    Task<StravaActivityDto?> GetActivityByIdAsync(string accessToken, long activityId);
     Task<bool> RefreshTokenIfNeededAsync(User user);
 }
 
